@@ -60,3 +60,8 @@ while True:
         chunk += (bytes.fromhex('ff') * (8192-l))
     print( "chunk #%02d:  sum: %04X  crc: %04X" % ( chunk_nr, calc_sum( chunk), calc_crc( chunk)))
     chunk_nr += 1
+
+file.seek( 0)
+data = file.read()
+print( "all:  sum: %04X  crc: %04X" % ( calc_sum( data), calc_crc( data)))
+file.close()

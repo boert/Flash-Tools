@@ -1,27 +1,28 @@
 #all: MODUL.BIN
 
-flashcheck.kcc: flashcheck.bin
-		mv flashcheck.bin flashcheck.kcc
+romcheck.kcc: romcheck.bin
+		mv romcheck.bin romcheck.kcc
 
-flashcheck.bin: flashcheck.asm datetime.inc date.inc
-		pasmo -v flashcheck.asm flashcheck.bin flashcheck.symbol
+romcheck.bin: romcheck.asm datetime.inc date.inc
+		#pasmo -v romcheck.asm romcheck.bin romcheck.symbol
+		z80asm --list=romcheck.lst --output romcheck.bin  $<
 
 
-datetime.inc: FORCE
-		@echo -n "BUILDSTR DB 'build: "      >  datetime.inc
+.PHONY: datetime.inc
+datetime.inc:
+		@echo -n "BUILDSTR:DB 'build: "      >  datetime.inc
 		@echo -n `date +"%d.%m.%y %H:%M"`    >> datetime.inc
 		@echo -n "', 0"                      >> datetime.inc
 
-date.inc: FORCE
-		@echo -n "BUILDSTR DB          '"    >  date.inc
+.PHONY: date.inc
+date.inc:
+		@echo -n "BUILDSTR:DB          '"    >  date.inc
 		@echo -n `date +"%d.%m.%Y"`          >> date.inc
 		@echo -n "', 0"                      >> date.inc
 
-FORCE:
-
 clean:
-		rm -f flashcheck.bin
-		rm -f flashcheck.symbol
+		rm -f romcheck.bin
+		rm -f romcheck.symbol
 		rm -f datetime.inc
 		rm -f date.inc
 

@@ -20,7 +20,7 @@ def ror(n, rotations, width = 8):
 
 def calc_sum( data):
     sum = 0
-    for d in data:
+    for index, d in enumerate( data):
         sum += int( d)
     sum %= 65536
     return sum
@@ -65,3 +65,7 @@ file.seek( 0)
 data = file.read()
 print( "all:  sum: %04X  crc: %04X" % ( calc_sum( data), calc_crc( data)))
 file.close()
+
+#for part in range( 16):
+#    print( "part #%02d:  sum: %04X  crc: %04X" % ( part, calc_sum( data[0:8192*(part+1)]), calc_crc( data[0:8192*(part+1)])))
+

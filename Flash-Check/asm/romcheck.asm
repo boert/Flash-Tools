@@ -1,7 +1,7 @@
 
 ;---------------------------------------- 
 
-PV1:    EQU     0F003h 	; Sprungverteiler
+PV1:    EQU     0F003h	; Sprungverteiler
 
 
 ; CAOS Funktionsnummern
@@ -29,8 +29,9 @@ CSTBT:	EQU	042h
 ZKOUT:  EQU     045h
 
 ; Sonderzeichen
+CLL:	EQU	002h	; clear line
 BREAK:	EQU	003h
-CUL:	EQU	008h
+CUL:	EQU	008h	; cursor left
 CUR:	EQU	009h
 CUD:    EQU     00Ah
 LF:     EQU     00Ah
@@ -65,7 +66,7 @@ PROGADR: EQU 0200h
 	ds      PROGADR - 070h - $
 	ORG	PROGADR - 070h
 
-        DB	3 	    ; Argumente (3 = Autostart)
+        DB	3	    ; Argumente (3 = Autostart)
         DW	KCCBEGIN    ; Loadadresse
         DW	KCCEND      ; Endadress(+1)
         DW	START       ; Startadresse
@@ -81,7 +82,148 @@ PROGADR: EQU 0200h
 	ORG PROGADR	
 KCCBEGIN:
 
-        ; Menüwort
+	; -------------------- 
+        ; Menüwort 1
+        DW	07F7Fh
+        DB	"SUM"
+        DB	01h
+	
+	; A = ARGN (0..3)
+	; HL = ARG1
+	; DE = ARG2
+	; BC = ARG3
+
+	; Abfrage: kleiner 2 (=0 oder =1)
+	CP	2
+	JR	C, SUMHELP
+
+	; Abfrage: ungleich 2 (=3)
+	JR	NZ, SUMRUN
+	LD      BC, 00000h  ; Startwert (wird nach DE getauscht)
+SUMRUN:
+	; Austausch BC, DE
+	LD	A, B
+	LD	B, D
+	LD	D, A
+
+	LD	A, C
+	LD	C, E
+	LD	E, A
+
+        CALL    CHSUM
+        EX      DE, HL      ; Ergenbis nach HL
+
+        CALL    PV1
+        DB      HLHX
+        CALL    PV1
+        DB      CRLF
+
+	RET
+
+SUMHELP:
+        LD	HL, MSGSUMHELP
+	CALL	PV1
+	DB	ZKOUT
+
+	RET
+
+
+	; -------------------- 
+        ; Menüwort 2
+        DW	07F7Fh
+        DB	"CRC"
+        DB	01h
+
+	; Abfrage: kleiner 2 (=0 oder =1)
+	CP	2
+	JR	C, CRCHELP
+
+	; Abfrage: ungleich 2 (=3)
+	JR	NZ, CRCRUN
+	LD      BC, 0FFFFh ; Startwert (wird nach DE getauscht)
+CRCRUN:
+	; Austausch BC, DE
+	LD	A, B
+	LD	B, D
+	LD	D, A
+
+	LD	A, C
+	LD	C, E
+	LD	E, A
+
+	CALL	CRCSUM
+        EX      DE, HL      ; Ergenbis nach HL
+
+        CALL    PV1
+        DB      HLHX
+        CALL    PV1
+        DB      CRLF
+
+	RET
+
+CRCHELP:
+        LD	HL, MSGCRCHELP
+	CALL	PV1
+	DB	ZKOUT
+
+	RET
+
+
+	; -------------------- 
+        ; Menüwort 3
+        DW	07F7Fh
+        DB	"MODSEARCH"
+        DB	01h
+
+	LD	L, 0	; Startwert für Slot
+	
+NEXTSLOT:
+	CALL	CLRLINE 
+
+	LD	A, L
+	; Schacht ausgeben
+	CALL	PV1
+	DB	AHEX
+	
+	CALL	PV1
+	DB	SPACE
+
+	XOR	A
+        
+	CALL    PV1
+        DB      MODU
+
+	; auf 0xFF prüfen
+	LD	A, H
+	SUB	0xFF
+	JR	Z, CHKNEXT
+
+	; Strukturbyte ausgeben
+	LD	A, H
+	CALL	PV1
+	DB	AHEX
+	
+	CALL	PV1
+	DB	SPACE
+	
+	LD	A, H
+	CALL	MOD_ID
+
+	CALL	PV1
+	DB	CRLF
+	
+
+CHKNEXT:
+
+	INC	L
+	LD	A, L
+	SUB	0xFF	; Endwert für Slot
+	JR	NZ, NEXTSLOT
+
+	CALL	CLRLINE 
+	RET
+
+        ; Menüwort 4
         DW	07F7Fh
         DB	"ROMCHECK"
         DB	01h
@@ -95,19 +237,19 @@ START:
         push    HL
         push    AF
         ; Ausgabe Titel
-        LD  	HL, MSGSTART
-        CALL 	PV1
-        DB  	ZKOUT
-        LD  	HL, BUILDSTR
-        CALL 	PV1
-        DB  	ZKOUT
-        LD  	HL, MSGSLOT
-        CALL 	PV1
-        DB  	ZKOUT
+        LD	HL, MSGSTART
+        CALL	PV1
+        DB	ZKOUT
+        LD	HL, BUILDSTR
+        CALL	PV1
+        DB	ZKOUT
+        LD	HL, MSGSLOT
+        CALL	PV1
+        DB	ZKOUT
         pop     AF
         pop     HL
 
-        ; Anazahl Parameter (A) prüfen
+        ; Anzahl Parameter (A) prüfen
         OR      A
         JR      Z, SLOT8
         LD      A, L
@@ -122,9 +264,9 @@ SLOTRDY:
         DB      AHEX
         
         ; Ausgabe Header
-	LD  	HL, MSGHEADER
-        CALL 	PV1
-        DB  	ZKOUT
+	LD	HL, MSGHEADER
+        CALL	PV1
+        DB	ZKOUT
 
 	; Prüfsummen über die einzelnen Segmente
         LD      b, 16       ; Zähler
@@ -133,6 +275,8 @@ MLOOP:
         push    bc
         call    SET_SEGMENT
         
+	; Zeile freimachen
+	CALL	CLRLINE 
 	; Steuerbyte ausgeben
 	CALL    PV1
         DB      AHEX
@@ -167,9 +311,9 @@ MLOOP:
 
 
 	; Prüfsumme SUM über alle Segmente
-	LD  	HL, MSGSUM
-        CALL 	PV1
-        DB  	ZKOUT
+	LD	HL, MSGSUM
+        CALL	PV1
+        DB	ZKOUT
 
         LD      b, 16       ; Zähler
         LD      c, 0        ; Segmentnummer
@@ -194,17 +338,16 @@ MLOOP2:
 
         EX      DE, HL      ; Ergenbis nach HL
 
-        CALL    PV1
-        DB      SPACE
+	call	FIX_CURSO
         CALL    PV1         ; ausgeben
         DB      HLHX
         CALL    PV1
         DB      CRLF
         
 	; Prüfsumme CRC über alle Segmente
-	LD  	HL, MSGCRC
-        CALL 	PV1
-        DB  	ZKOUT
+	LD	HL, MSGCRC
+        CALL	PV1
+        DB	ZKOUT
 
         LD      b, 16       ; Zähler
         LD      c, 0        ; Segmentnummer
@@ -229,13 +372,12 @@ MLOOP3:
 
         EX      DE, HL      ; Ergenbis nach HL
 
-        CALL    PV1         ; ausgeben
-        DB      SPACE
+	call	FIX_CURSO
         CALL    PV1         ; ausgeben
         DB      HLHX
         CALL    PV1
         DB      CRLF
-        
+	CALL	CLRLINE 
 
         ; Modul abschalten
         LD      HL, SLOT
@@ -271,9 +413,6 @@ CHSUM_DEC:
         ld      e, a
         inc     hl         ; Addresse++
         djnz    CHSUM_LP
-	;dec     bc         ; Laenge--
-        ;ld      a, b        
-        ;or      c          ; pruefen auf BC = 0
 	dec     c
         jr      nz, CHSUM_LP
         ret
@@ -286,9 +425,9 @@ CHSUM_DEC:
 	; DE = Startwert
         ; Ergebnis -> DE
 CRCSUM:
-        ; Vorbereitung Schleifenzähler, Alternaive ohne Modifikation DE
-                        	; A  F  B  C   D  E   H  L
-                        	;       Lh Ll         Sh Sl	; Start
+        ; Vorbereitung Schleifenzähler, Alternative ohne Modifikation DE
+				; A  F  B  C   D  E   H  L
+				;       Lh Ll         Sh Sl	; Start
 	ld   a, c		; Ll    Lh Ll
 	dec  bc			;       Mh Ml
 	inc  b                  ;       Nh Ml
@@ -340,9 +479,9 @@ CRCSUM_LP:
 	;   A - Steuerbyte
 SET_SEGMENT:
         LD      B, 0
-        LD 	HL, MODCTRL
-        ADD 	HL, BC
-        LD	A, (HL)	; Steuerbyte
+        LD	HL, MODCTRL
+        ADD	HL, BC
+        LD	A, (HL)	    ; Steuerbyte
 
 	push	af
 	push	de
@@ -366,43 +505,172 @@ FIX_CURSO:
 	LD	(HL), A
 	POP	HL
 	RET
+
+
+	; Zeile freimachen
+CLRLINE:
+	PUSH	AF
+	LD	A, CLL	    ; clear line
+	CALL	PV1
+	DB	CRT
+	POP	AF
+	RET
+
+	; Modulkennung im Klartext
+	; ausgeben
+MOD_ID:
+	PUSH	HL
+        LD	HL, MSGUNKOWN
+
+	CP	0x72
+	JR	NZ, MOD_ID_1
+        LD	HL, MSG_72
+	JR	MOD_OUT
+
+MOD_ID_1:
+	CP	0xF7
+	JR	NZ, MOD_ID_2
+        LD	HL, MSG_F7
+	JR	MOD_OUT
+
+MOD_ID_2:
+	CP	0xF8
+	JR	NZ, MOD_ID_3
+        LD	HL, MSG_F8
+	JR	MOD_OUT
+
+MOD_ID_3:
+	CP	0xFB
+	JR	NZ, MOD_ID_4
+        LD	HL, MSG_FB
+	JR	MOD_OUT
+
+MOD_ID_4:
+	CP	0xFC
+	JR	NZ, MOD_ID_5
+        LD	HL, MSG_FC
+	JR	MOD_OUT
+
+MOD_ID_5:
+	CP	0xFD
+	JR	NZ, MOD_ID_6
+        LD	HL, MSG_FD
+	JR	MOD_OUT
+
+MOD_ID_6:
+	CP	0x01
+	JR	NZ, MOD_ID_7
+        LD	HL, MSG_01
+	JR	MOD_OUT
+
+MOD_ID_7:
+MOD_OUT:
+	CALL	PV1
+	DB	ZKOUT
+	POP	HL
+	RET
+
+MSGUNKOWN:
+	DB	"--", 0
+MSG_01:	DB	"Autostart", 0
+MSG_72:	DB	"ROM  8k*16", 0
+MSG_F7:	DB	"ROM  8k* 1", 0
+MSG_F8:	DB	"ROM 16k* 1", 0
+MSG_FB:	DB	"ROM  8k* 1", 0
+MSG_FC:	DB	"ROM 16k* 1", 0
+MSG_FD:	DB	"ROM  8k* 4", 0
+
+PAR_8_1:
+	DB	8	; kByte
+	DW	1	; Anzahl
+	DB	0	; Shift
+
+PAR_8_2:
+	DB	8	; kByte
+	DW	2	; Anzahl
+	DB	4	; Shift
+
+PAR_8_4_3:
+	DB	8	; kByte
+	DW	4	; Anzahl
+	DB	3	; Shift
+
+PAR_8_4_4:
+	DB	8	; kByte
+	DW	4	; Anzahl
+	DB	4	; Shift
+
+PAR_8_8:
+	DB	8	; kByte
+	DW	8	; Anzahl
+	DB	3	; Shift
+
+PAR_8_16:
+	DB	8	; kByte
+	DW	16	; Anzahl
+	DB	2	; Shift
+
+PAR_16_1:
+	DB	16	; kByte
+	DW	1	; Anzahl
+	DB	0	; Shift
+
+PAR_16_16:
+	DB	16	; kByte
+	DW	16	; Anzahl
+	DB	2	; Shift
         
 
-MODBASE:	EQU	0C0h		; Modul-Basisadresse
-MODCTRL:	DB	MODBASE + 001h, MODBASE + 005h
-		DB	MODBASE + 009h, MODBASE + 00Dh
-                DB	MODBASE + 011h, MODBASE + 015h
-                DB	MODBASE + 019h, MODBASE + 01Dh
-                DB	MODBASE + 021h, MODBASE + 025h
-                DB	MODBASE + 029h, MODBASE + 02Dh
-                DB	MODBASE + 031h, MODBASE + 035h
-                DB	MODBASE + 039h, MODBASE + 03Dh
+MODBASE:EQU	0C0h		; Modul-Basisadresse
+MODCTRL:	
+	DB	MODBASE + 001h, MODBASE + 005h
+	DB	MODBASE + 009h, MODBASE + 00Dh
+        DB	MODBASE + 011h, MODBASE + 015h
+        DB	MODBASE + 019h, MODBASE + 01Dh
+        DB	MODBASE + 021h, MODBASE + 025h
+        DB	MODBASE + 029h, MODBASE + 02Dh
+        DB	MODBASE + 031h, MODBASE + 035h
+        DB	MODBASE + 039h, MODBASE + 03Dh
 
 SLOT:   DB  0
 
 MSGSTART:
-        DB      "ROM-checker", CR, LF, 0
+        DB      CLL
+	DB	"ROM-checker", CR, LF, CLL, 0
 MSGSLOT:  
-	DB      CR, LF
+	DB      CR, LF, CLL
 	DB      "Slot: ", 0
 
 MSGHEADER:
-        DB      CR, LF
-	DB  	"CB SUM   CRC"   
-        DB      CR, LF
+        DB      CR, LF, CLL
+	DB	"CB SUM   CRC"   
+        DB      CR, LF, CLL
 	DB      "-- ----  ----"
-	DB      CR, LF, 0
+	DB      CR, LF, CLL, 0
 MSGSUM:   
-        DB      "SUM 00" , 0
+        DB      CLL
+	DB	"SUM 00" , 0
 MSGCRC:   
-        DB      "CRC 00" , 0
+        DB      CLL
+	DB	"CRC 00" , 0
+
+MSGSUMHELP:
+        DB      CLL
+	DB	"SUM SADDR LENGTH (START_VALUE)"
+	DB      CR, LF, CLL, 0
+
+MSGCRCHELP:
+        DB      CLL
+	DB	"CRC SADDR LENGTH (START_VALUE)"
+	DB      CR, LF, CLL, 0
 
 include "date.inc"
 
 	; fill up with 0xff
 ;ALIGN2:	EQU	128 - (($+128) % 128)
 	;DS	ALIGN2, 0xff
-	ds	0x400 - $
+	; jeweils 128 (0x80) hinzufügen, bei asm-Fehler
+	ds	0x580 - $
 KCCEND:
 
 ; vim: set tabstop=8 noexpandtab:

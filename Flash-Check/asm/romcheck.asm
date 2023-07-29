@@ -27,6 +27,7 @@ WINAK:	EQU	03Dh
 LINE:	EQU	03Eh
 CSTBT:	EQU	042h
 ZKOUT:  EQU     045h
+HLDEZ:	EQU	04Ah
 
 ; Sonderzeichen
 CLL:	EQU	002h	; clear line
@@ -66,7 +67,7 @@ PROGADR: EQU 0200h
 	ds      PROGADR - 070h - $
 	ORG	PROGADR - 070h
 
-        DB	3	    ; Argumente (3 = Autostart)
+        DB	2	    ; Argumente (3 = Autostart)
         DW	KCCBEGIN    ; Loadadresse
         DW	KCCEND      ; Endadress(+1)
         DW	START       ; Startadresse
@@ -169,18 +170,19 @@ CRCHELP:
 	RET
 
 
-	; -------------------- 
+	;------------------------------
         ; Menüwort 3
         DW	07F7Fh
-        DB	"MODSEARCH"
+        DB	"ROMSEARCH"
         DB	01h
 
-	LD	L, 0	; Startwert für Slot
+	LD	C, 0	; Startwert für Slot
 	
 NEXTSLOT:
+	PUSH	BC
 	CALL	CLRLINE 
 
-	LD	A, L
+	LD	A, C
 	; Schacht ausgeben
 	CALL	PV1
 	DB	AHEX
@@ -188,6 +190,7 @@ NEXTSLOT:
 	CALL	PV1
 	DB	SPACE
 
+	LD	L, C
 	XOR	A
         
 	CALL    PV1
@@ -209,20 +212,80 @@ NEXTSLOT:
 	LD	A, H
 	CALL	MOD_ID
 
+	LD	H, (IY + PAR_MSGH)
+	LD	L, (IY + PAR_MSGL)
+
+	CALL	PV1
+	DB	ZKOUT
+
+	; kein ROM oder Autostart
+	LD	A, (IY + PAR_STRUCT)
+	CP	2
+	JR	C, CHKNEXTCR
+
+
+	; Segmentanzahl
+	LD	H, (IY + PAR_SEGMENTSH)
+	LD	L, (IY + PAR_SEGMENTSL)
+	CALL	DispHL
+
+	; mal
+	LD	A, '*'
+	CALL	PV1
+	DB	CRT
+
+
+	; Segmentgröße
+	LD	A, (IY + PAR_SEGSIZE)
+	LD	H, 0
+	LD	L, A
+	CALL	DispHL
+
+	LD	A, 'k'
+	CALL	PV1
+	DB	CRT
+
+	CALL	PV1
+	DB	SPACE
+    
+	; Klammer auf
+	LD	A, '('
+	CALL	PV1
+	DB	CRT
+	
+	; Speichergröße
+	LD	D, (IY + PAR_SEGMENTSH)
+	LD	E, (IY + PAR_SEGMENTSL)
+	LD	A, (IY + PAR_SEGSIZE)
+
+	CALL	mult_a_de
+	CALL	DispHL
+
+	LD	A, 'k'
+	CALL	PV1
+	DB	CRT
+
+	; Klammer zu
+	LD	A, ')'
+	CALL	PV1
+	DB	CRT
+
+CHKNEXTCR:
 	CALL	PV1
 	DB	CRLF
-	
 
 CHKNEXT:
-
-	INC	L
-	LD	A, L
+	POP	BC
+	INC	C
+	LD	A, C
 	SUB	0xFF	; Endwert für Slot
-	JR	NZ, NEXTSLOT
+	JP	NZ, NEXTSLOT
 
 	CALL	CLRLINE 
 	RET
 
+
+	;------------------------------
         ; Menüwort 4
         DW	07F7Fh
         DB	"ROMCHECK"
@@ -240,12 +303,15 @@ START:
         LD	HL, MSGSTART
         CALL	PV1
         DB	ZKOUT
+
         LD	HL, BUILDSTR
         CALL	PV1
         DB	ZKOUT
+
         LD	HL, MSGSLOT
         CALL	PV1
         DB	ZKOUT
+
         pop     AF
         pop     HL
 
@@ -262,14 +328,88 @@ SLOTRDY:
         LD      (SLOT), A
         CALL    PV1
         DB      AHEX
+
+	; Strukturbyte holen
+	LD	A, (SLOT)
+	LD	L, A
+	XOR	A
         
+	CALL    PV1
+        DB      MODU
+
+	; auf 0xFF prüfen
+	LD	A, H
+	CP	0xFF
+	JP	Z, NOMOD
+	
+	; Strukturbyte suchen/prüfen
+	CALL	MOD_ID
+	
+	; Strukturbyte ausgeben
+	LD	HL, MSGSTRUCT
+	CALL	PV1
+	DB	ZKOUT
+
+	LD	A, (IY + PAR_STRUCT)
+	CALL	PV1
+	DB	AHEX
+
+        ; Modultyp
+        LD	HL, MSGTYP
+        CALL	PV1
+        DB	ZKOUT
+
+        LD	H, (IY + PAR_MSGH)
+        LD	L, (IY + PAR_MSGL)
+        CALL	PV1
+        DB	ZKOUT
+
+	; kein ROM oder Autostart
+	LD	A, (IY + PAR_STRUCT)
+	CP	2
+	JP	C, NOROMMOD
+
+        ; Segmentgröße
+        LD	HL, MSGSEGSIZE
+        CALL	PV1
+        DB	ZKOUT
+
+        LD	A, (IY + PAR_SEGSIZE)
+        LD	H, 0
+        LD	L, A
+        CALL	DispHL
+
+        LD	A, 'k'
+        CALL	PV1
+        DB	CRT
+
+        ; Zahl der Segemente
+        LD	HL, MSGSEGMENTS
+        CALL	PV1
+        DB	ZKOUT
+
+        LD	H, (IY + PAR_SEGMENTSH)
+        LD	L, (IY + PAR_SEGMENTSL)
+        CALL	DispHL
+
+	CALL	PV1
+	DB	CRLF
+	CALL	CLRLINE
+        
+	; mehr als 1 Segment?
+	; (weniger als 2 Segmente)
+	LD	A, (IY + PAR_SEGMENTSL)
+	CP	2
+	JR      C, NOSINGLE
+
         ; Ausgabe Header
 	LD	HL, MSGHEADER
         CALL	PV1
         DB	ZKOUT
 
 	; Prüfsummen über die einzelnen Segmente
-        LD      b, 16       ; Zähler
+	LD	A, (IY + PAR_SEGMENTSL)
+        LD      b, A        ; Zähler
         LD      c, 0        ; Segmentnummer
 MLOOP:
         push    bc
@@ -277,6 +417,17 @@ MLOOP:
         
 	; Zeile freimachen
 	CALL	CLRLINE 
+	; Index ausgeben
+	POP	BC
+	PUSH	BC
+	PUSH	AF
+	LD	A, C
+	CALL    PV1
+        DB      AHEX
+        CALL    PV1
+        DB      SPACE
+	POP	AF
+
 	; Steuerbyte ausgeben
 	CALL    PV1
         DB      AHEX
@@ -310,12 +461,15 @@ MLOOP:
         djnz    MLOOP
 
 
+NOSINGLE:
+
 	; Prüfsumme SUM über alle Segmente
 	LD	HL, MSGSUM
         CALL	PV1
         DB	ZKOUT
 
-        LD      b, 16       ; Zähler
+	LD	A, (IY + PAR_SEGMENTSL)
+        LD      b, A        ; Zähler
         LD      c, 0        ; Segmentnummer
 	LD      DE, 00000h  ; Startwert
 MLOOP2:
@@ -349,7 +503,8 @@ MLOOP2:
         CALL	PV1
         DB	ZKOUT
 
-        LD      b, 16       ; Zähler
+	LD	A, (IY + PAR_SEGMENTSL)
+        LD      b, A        ; Zähler
         LD      c, 0        ; Segmentnummer
 	LD      DE, 0FFFFh  ; Startwert
 MLOOP3:
@@ -389,6 +544,22 @@ MLOOP3:
 
         RET     ; zum CAOS
 
+	; alternatives Ende
+NOMOD:
+	LD	HL, MSGNOMODUL
+        CALL	PV1
+        DB	ZKOUT
+	
+	; 2. alternatives Ende
+NOROMMOD:
+	CALL	PV1
+	DB	CRLF
+	CALL	CLRLINE
+	
+	RET
+
+
+	;------------------------------
         ; Parameter
         ; HL = Startadresse
         ; BC = Laenge
@@ -419,6 +590,7 @@ CHSUM_DEC:
         
                     
 
+	;------------------------------
         ; Parameter
         ; HL = Startadresse
         ; BC = Laenge
@@ -473,16 +645,31 @@ CRCSUM_LP:
         jr   nz, CRCSUM_LP
         ret
 
+	;------------------------------
         ; Parameter:
         ;   C - Segmentnummer  
+	; TODO -> aufbohren auf 16 Bit
 	; Rückgabe:
 	;   A - Steuerbyte
 SET_SEGMENT:
-        LD      B, 0
-        LD	HL, MODCTRL
-        ADD	HL, BC
-        LD	A, (HL)	    ; Steuerbyte
+	LD	B, (IY + PAR_SHIFT)
 
+	; shiften
+SHIFT_NEXT:
+	LD	A, B
+	OR	A
+	JR	Z, SHIFT_READY
+	DEC	B
+	LD	A, C 	; Segmentnummer
+	RLCA
+	LD	C, A
+	JR	SHIFT_NEXT
+SHIFT_READY:
+	; und Offset addieren
+	LD	A, (IY + PAR_OFFSET)
+	ADD	C
+	; jetzt Steuerbyte in A
+	; und Modul schalten
 	push	af
 	push	de
         LD      HL, SLOT
@@ -493,10 +680,12 @@ SET_SEGMENT:
         DB      MODU
 	pop	de
 	pop	af
-        RET
+	RET
 
-FIX_CURSO:
+
+	;------------------------------
 	; Cursorposition korrigieren
+FIX_CURSO:
 	PUSH    HL
 	LD	HL, CURSO
 	LD	A, (HL)
@@ -506,7 +695,7 @@ FIX_CURSO:
 	POP	HL
 	RET
 
-
+	;------------------------------
 	; Zeile freimachen
 CLRLINE:
 	PUSH	AF
@@ -518,134 +707,279 @@ CLRLINE:
 
 	; Modulkennung im Klartext
 	; ausgeben
+	; Parameter
+	; A - Strukturbyte
+	; Ergebnis
+	; IY - Zeiger auf Modulstruktur
 MOD_ID:
-	PUSH	HL
-        LD	HL, MSGUNKOWN
+	PUSH	DE
+	PUSH	BC
+	LD	DE, PAR_SIZE
+	LD	IY, PAR_LIST
 
-	CP	0x72
-	JR	NZ, MOD_ID_1
-        LD	HL, MSG_72
-	JR	MOD_OUT
+NEXT_ID:
+	CP	(IY + 0)
+	JR	Z, ID_FOUND
+	
+	; letzter Eintrag?
+	LD	B, A
+	LD	A, (IY + 0)
+	OR	A
+	CP	0
+	LD	A, B
+	JR	Z, ID_FOUND
 
-MOD_ID_1:
-	CP	0xF7
-	JR	NZ, MOD_ID_2
-        LD	HL, MSG_F7
-	JR	MOD_OUT
+	ADD	IY, DE
+	JR	NEXT_ID
 
-MOD_ID_2:
-	CP	0xF8
-	JR	NZ, MOD_ID_3
-        LD	HL, MSG_F8
-	JR	MOD_OUT
-
-MOD_ID_3:
-	CP	0xFB
-	JR	NZ, MOD_ID_4
-        LD	HL, MSG_FB
-	JR	MOD_OUT
-
-MOD_ID_4:
-	CP	0xFC
-	JR	NZ, MOD_ID_5
-        LD	HL, MSG_FC
-	JR	MOD_OUT
-
-MOD_ID_5:
-	CP	0xFD
-	JR	NZ, MOD_ID_6
-        LD	HL, MSG_FD
-	JR	MOD_OUT
-
-MOD_ID_6:
-	CP	0x01
-	JR	NZ, MOD_ID_7
-        LD	HL, MSG_01
-	JR	MOD_OUT
-
-MOD_ID_7:
-MOD_OUT:
-	CALL	PV1
-	DB	ZKOUT
-	POP	HL
+ID_FOUND:
+	POP	BC
+	POP	DE
 	RET
 
-MSGUNKOWN:
-	DB	"--", 0
-MSG_01:	DB	"Autostart", 0
-MSG_72:	DB	"ROM  8k*16", 0
-MSG_F7:	DB	"ROM  8k* 1", 0
-MSG_F8:	DB	"ROM 16k* 1", 0
-MSG_FB:	DB	"ROM  8k* 1", 0
-MSG_FC:	DB	"ROM 16k* 1", 0
-MSG_FD:	DB	"ROM  8k* 4", 0
 
-PAR_8_1:
-	DB	8	; kByte
-	DW	1	; Anzahl
-	DB	0	; Shift
-
-PAR_8_2:
-	DB	8	; kByte
-	DW	2	; Anzahl
-	DB	4	; Shift
-
-PAR_8_4_3:
-	DB	8	; kByte
-	DW	4	; Anzahl
-	DB	3	; Shift
-
-PAR_8_4_4:
-	DB	8	; kByte
-	DW	4	; Anzahl
-	DB	4	; Shift
-
-PAR_8_8:
-	DB	8	; kByte
-	DW	8	; Anzahl
-	DB	3	; Shift
-
-PAR_8_16:
-	DB	8	; kByte
-	DW	16	; Anzahl
-	DB	2	; Shift
-
-PAR_16_1:
-	DB	16	; kByte
-	DW	1	; Anzahl
-	DB	0	; Shift
-
-PAR_16_16:
-	DB	16	; kByte
-	DW	16	; Anzahl
-	DB	2	; Shift
+;------------------------------
+; Multiplikation 8 Bit * 16 Bit
+; https://wikiti.brandonw.net/index.php?title=Z80_Routines:Math:Multiplication#16.2A8_multiplication
+mult_a_de:
+        ld	c, 0
+        ld	h, c
+        ld	l, h
+     
+        add	a, a		; optimised 1st iteration
+        jr	nc, $+4
+        ld	h,d
+        ld	l,e
+     
+        ld b, 7
+m_loop:
+        add	hl, hl
+        rla
+        jr	nc, $+4
+        add	hl, de
+        adc	a, c            ; yes this is actually adc a, 0 but since c is free we set it to zero and so we can save 1 byte and up to 3 T-states per iteration
         
+        djnz	m_loop
+        
+        ret
 
-MODBASE:EQU	0C0h		; Modul-Basisadresse
-MODCTRL:	
-	DB	MODBASE + 001h, MODBASE + 005h
-	DB	MODBASE + 009h, MODBASE + 00Dh
-        DB	MODBASE + 011h, MODBASE + 015h
-        DB	MODBASE + 019h, MODBASE + 01Dh
-        DB	MODBASE + 021h, MODBASE + 025h
-        DB	MODBASE + 029h, MODBASE + 02Dh
-        DB	MODBASE + 031h, MODBASE + 035h
-        DB	MODBASE + 039h, MODBASE + 03Dh
+;------------------------------
+; Ausgabe HL als Dezimalzahl
+; Erweitert: Vornullen werden unterdrückt und Register gesichert
+;https://wikiti.brandonw.net/index.php?title=Z80_Routines:Other:DispHL
+;Number in hl to decimal ASCII
+;Thanks to z80 Bits
+;inputs:	hl = number to ASCII
+;example: hl=300 outputs '00300'
+;destroys: af, bc, hl, de used
+DispHL:
+	PUSH	AF
+	PUSH	HL
+	PUSH	BC
+	PUSH	DE
+	CALL	disprun
+	; wenn B = 0 (= nix ausgegeben)
+	ld	a, b
+	or	a
+	jr	nz, Disp_rdy
+	; dann eine 0 ausgeben
+	ld	a, '0'
+	CALL	PV1
+	DB	CRT
+Disp_rdy:
+	POP	DE
+	POP	BC
+	POP	HL
+	POP	AF
+	RET
 
-SLOT:   DB  0
+disprun:
+	ld	b, 0
+	ld	de,-10000
+	call	Num1
+	ld	de,-1000
+	call	Num1
+	ld	de,-100
+	call	Num1
+	ld	e,-10
+	call	Num1
+	ld	e,-1
+Num1:	ld	a,'0'-1
+Num2:	inc	a
+	add	hl,de
+	jr	c,Num2
+	sbc	hl,de
+	
+	cp	'0'
+	ret	z
+	inc	b
+
+	CALL	PV1
+	DB	CRT
+	ret 
+
+
+;------------------------------
+; data segment
+; ab hier nur Datenstrukturen
+
+MSGUNKOWN:
+	DB	"kein ROM", 0
+MSG_01:	DB	"Autostart", 0
+MSG_ROM1:DB	"segmented ROM ", 0
+MSG_ROM2:DB	"USER ROM ", 0
+MSG_ROM3:DB	"PROM ", 0
+MSG_ROM4:DB	"M052 ", 0
+
+PAR_SIZE:	EQU 8	; Länge eines Eintrags
+; Definition der jeweilgen Offsets
+PAR_STRUCT:	EQU 0
+PAR_SEGSIZE:	EQU 1
+PAR_SEGMENTSL:	EQU 2
+PAR_SEGMENTSH:	EQU 3
+PAR_OFFSET:	EQU 4
+PAR_SHIFT:	EQU 5
+PAR_MSGL:	EQU 6
+PAR_MSGH:	EQU 7
+; hier gehts los
+PAR_LIST:
+	; Autostart
+	DB	0x01	; Strukturbyte	+0
+	DB	0	; kByte		+1
+	DW	0	; Segmente	+2
+	DB	0	; Offset	+4
+	DB	0	; Shift		+5
+	DW	MSG_01  ;		+6
+
+	;  32k ROM
+	DB	0x70	; Strukturbyte
+	DB	8	; kByte
+	DW	4	; Segmente
+	DB	0xC1	; Offset
+	DB	4	; Shift
+	DW	MSG_ROM1
+
+	;  64k ROM (Brücken umsetzen!)
+	DB	0x71	; Strukturbyte
+	DB	8	; kByte
+	DW	8	; Segmente
+	DB	0xC1	; Offset
+	DB	3	; Shift
+	DW	MSG_ROM1
+
+	; 128k ROM
+	DB	0x72	; Strukturbyte
+	DB	8	; kByte
+	DW	16	; Segmente
+	DB	0xC1	; Offset
+	DB	2	; Shift
+	DW	MSG_ROM1
+
+	; 256k ROM
+	DB	0x73	; Strukturbyte
+	DB	16	; kByte
+	DW	16	; Segmente
+	DB	0xC0	; Offset
+	DB	2	; Shift
+	DW	MSG_ROM1
+
+	; 512k ROM
+	DB	0x74	; Strukturbyte
+	DB	16	; kByte
+	DW	32	; Segmente
+	DB	0   	; Offset
+	DB	1	; Shift
+	DW	MSG_ROM1
+
+	; 1024k ROM, M050
+	DB	0x75	; Strukturbyte
+	DB	8	; kByte
+	DW	128	; Segmente
+	DB	1	; Offset
+	DB	0	; Shift
+	DW	MSG_ROM1
+
+	; M025/M040
+	DB	0xF7	; Strukturbyte
+	DB	8	; kByte
+	DW	1	; Segmente
+	DB	0xC1	; Offset
+	DB	0	; Shift
+	DW	MSG_ROM2
+
+	; M028/M040
+	DB	0xF8	; Strukturbyte
+	DB	16	; kByte
+	DW	1	; Segmente
+	DB	0xC1	; Offset
+	DB	0	; Shift
+	DW	MSG_ROM2
+
+	; M012/M026/M027
+	DB	0xFB	; Strukturbyte
+	DB	8	; kByte
+	DW	1	; Segmente
+	DB	0xC1	; Offset
+	DB	0	; Shift
+	DW	MSG_ROM3
+
+	; M006/M028
+	DB	0xFC	; Strukturbyte
+	DB	16	; kByte
+	DW	1	; Segmente
+	DB	0xC1	; Offset
+	DB	0	; Shift
+	DW	MSG_ROM3
+
+	; M052
+	DB	0xFD	; Strukturbyte
+	DB	8	; kByte
+	DW	4	; Segmente
+	DB	0xC1	; Offset
+	DB	3	; Shift
+	DW	MSG_ROM4
+	
+	; unknown
+	; = letzter Eintrag in Liste, Strukturbyte = 0x00
+	DB	0x00	; Strukturbyte	
+	DB	0	; kByte
+	DW	0	; Segmente
+	DB	0	; Offset
+	DB	0	; Shift
+	DW	MSGUNKOWN
 
 MSGSTART:
         DB      CLL
-	DB	"ROM-checker", CR, LF, CLL, 0
+	DB	"ROM-checker, ", 0
 MSGSLOT:  
 	DB      CR, LF, CLL
+	DB      CR, LF, CLL
 	DB      "Slot: ", 0
+MSGSTRUCT:  
+	DB      CR, LF, CLL
+	DB      "Strukturbyte: ", 0
+MSGTYP:  
+	DB      CR, LF, CLL
+	DB      "Modultyp: ", 0
+MSGSEGSIZE:  
+	DB      CR, LF, CLL
+	DB      "Segmentgr", 0x7c, 0x7e 
+	DB	"e: ", 0
+MSGSEGMENTS: 
+	DB      CR, LF, CLL
+	DB      "Segmente: ", 0
+
+MSGNOMODUL:
+	DB      CR, LF, CLL
+	DB	"Kein Modul gefunden!"
+	;DB	CR, LF, CLL
+	DB	0
 
 MSGHEADER:
         DB      CR, LF, CLL
-	DB	"CB SUM   CRC"   
+	DB	"IX CB SUM   CRC"   
         DB      CR, LF, CLL
-	DB      "-- ----  ----"
+	DB      "-- -- ----  ----"
 	DB      CR, LF, CLL, 0
 MSGSUM:   
         DB      CLL
@@ -666,11 +1000,18 @@ MSGCRCHELP:
 
 include "date.inc"
 
+
+;------------------------------
+; data segment
+SLOT:   DB  0
+
+
 	; fill up with 0xff
 ;ALIGN2:	EQU	128 - (($+128) % 128)
 	;DS	ALIGN2, 0xff
 	; jeweils 128 (0x80) hinzufügen, bei asm-Fehler
-	ds	0x580 - $
+	;ds	(14 * 0x80) - $
+	ds	0x700 - $
 KCCEND:
 
 ; vim: set tabstop=8 noexpandtab:

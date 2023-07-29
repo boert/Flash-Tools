@@ -33,12 +33,23 @@ Beispielausgabe für ein M052 mit vier ROM Segmenten:
 Mit dem Programm SUM läßt sich die einfache Prüfsumme (SUM16) über einen bestimmten Speicherbereich ermitteln.
 Als Parameter werden die Startadresse und die Länge benötigt.
 Optional läßt sich ein Startwert angeben. Damit läßt sich die Prüfsumme über mehrere Speicherbereiche ermitteln.
-Für das aktivieren der richtigen Speicherbereiche ist der Anwender verantwortlich.
+Für das Aktivieren der richtigen Speicherbereiche (SWITCH) ist der Anwender verantwortlich.
 
+Das Beispiel erzeugt die Prüfsumme über den RAM-Bereich von 4000h bis 4FFFh:
+
+```
+SUM 4000 1000
+```
 
 ## CRC
 Mit dem Programm CRC läßt sich die Prüfsumme (CRC16) über einen bestimmten Speicherbereich ermitteln.
 Als Parameter werden die Startadresse und die Länge benötigt.
 Optional läßt sich ein Startwert angeben. Damit läßt sich die Prüfsumme über mehrere Speicherbereiche ermitteln.
-Für das aktivieren der richtigen Speicherbereiche ist der Anwender verantwortlich.
+Für das Aktivieren der richtigen Speicherbereiche (SWITCH) ist der Anwender verantwortlich.
+
+Das Beispiel erzeugt die CRC-Prüfsumme über den ROM-Bereich von C000h bis DFFFh und verwendet als Startwert 55AAh:
+
+```
+CRC C000 2000 55AA
+```
 

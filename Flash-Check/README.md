@@ -85,4 +85,5 @@ Bemerkung              | Binärdarstellung
 Segmentnummer 2        | 0000 0010b
 Shift um 3 nach links  | 0001 0000b
 Basisbyte  0C1h        | 1100 0001b
-Addition mit Basisbyte | 1101 0001b --> 0D1h
+Addition mit Basisbyte | 1101 0001b 
+Ergebnis: 0D1h

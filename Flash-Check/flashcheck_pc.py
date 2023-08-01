@@ -63,7 +63,7 @@ while True:
 
 file.seek( 0)
 data = file.read()
-print( "all:  sum: %04X  crc: %04X" % ( calc_sum( data), calc_crc( data)))
+print( "all:\nsum: %04X\ncrc: %04X" % ( calc_sum( data), calc_crc( data)))
 file.close()
 
 #for part in range( 16):

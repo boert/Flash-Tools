@@ -21,6 +21,7 @@ MODU:	EQU	026h
 SPACE:	EQU	02Bh
 CRLF:	EQU	02Ch
 HOME:	EQU	02Dh
+DABR:	EQU	032h
 PADR:	EQU	034h
 WININ:	EQU	03Ch
 WINAK:	EQU	03Dh
@@ -30,6 +31,7 @@ ZKOUT:  EQU     045h
 HLDEZ:	EQU	04Ah
 
 ; Sonderzeichen
+BCLR:	EQU	001h	; Backspace clear
 CLL:	EQU	002h	; clear line
 BREAK:	EQU	003h
 CUL:	EQU	008h	; cursor left
@@ -197,6 +199,7 @@ NEXTSLOT:
         DB      MODU
 
 	; auf 0xFF prüfen
+	; 0xFF = kein Modul
 	LD	A, H
 	SUB	0xFF
 	JR	Z, CHKNEXT
@@ -278,7 +281,7 @@ CHKNEXT:
 	POP	BC
 	INC	C
 	LD	A, C
-	SUB	0xFF	; Endwert für Slot
+	CP 	0xFF	; Endwert für Slot
 	JP	NZ, NEXTSLOT
 
 	CALL	CLRLINE 
@@ -292,7 +295,7 @@ CHKNEXT:
         DB	01h
 START:
         ; Parameter
-        ;  A = ARGN
+        ;  A = ARGN A=Anzahl
         ; HL = ARG1 L=Modulschacht
         ; DE = ARG2
         ; BC = ARG3
@@ -329,7 +332,7 @@ SLOTRDY:
         CALL    PV1
         DB      AHEX
 
-	; Strukturbyte holen
+	; Strukturbyte lesen
 	LD	A, (SLOT)
 	LD	L, A
 	XOR	A
@@ -338,6 +341,7 @@ SLOTRDY:
         DB      MODU
 
 	; auf 0xFF prüfen
+	; 0xFF = kein Modul
 	LD	A, H
 	CP	0xFF
 	JP	Z, NOMOD
@@ -364,9 +368,9 @@ SLOTRDY:
         CALL	PV1
         DB	ZKOUT
 
-	; kein ROM oder Autostart
+	; kein ROM-Modul
 	LD	A, (IY + PAR_STRUCT)
-	CP	2
+	CP	1
 	JP	C, NOROMMOD
 
         ; Segmentgröße
@@ -375,10 +379,26 @@ SLOTRDY:
         DB	ZKOUT
 
         LD	A, (IY + PAR_SEGSIZE)
-        LD	H, 0
+	; auf 0 prüfen
+	OR	A
+	JR	Z, INPUT_SEGSIZE
+
+	; ausgeben
+	LD	H, 0
         LD	L, A
         CALL	DispHL
+	JR	INPUT_SEGSIZE2
 
+	; eingeben
+INPUT_SEGSIZE:
+	LD	A, 2		; zwei Stellen
+	CALL	INPUT_DECIMAL
+
+	; abspeichern
+	LD	A, L
+	LD	(IY + PAR_SEGSIZE), A
+
+INPUT_SEGSIZE2:
         LD	A, 'k'
         CALL	PV1
         DB	CRT
@@ -390,12 +410,64 @@ SLOTRDY:
 
         LD	H, (IY + PAR_SEGMENTSH)
         LD	L, (IY + PAR_SEGMENTSL)
+	
+	; auf 0 prüfen
+	LD	A, L
+	ADD	H
+	OR	A
+	JR	Z, INPUT_SEGMENTS
+
+	; ausgeben
         CALL	DispHL
+	JR	INPUT_SEGMENTS2
+
+	; eingeben
+INPUT_SEGMENTS:
+	LD	A, 4	; Anzahl Stellen (1024)
+	CALL	INPUT_DECIMAL
+
+	; abspeichern
+        LD	(IY + PAR_SEGMENTSH), H
+        LD	(IY + PAR_SEGMENTSL), L
+
+INPUT_SEGMENTS2:
 
 	CALL	PV1
 	DB	CRLF
 	CALL	CLRLINE
-        
+
+
+        LD	A, (IY + PAR_OFFSET)
+	; auf 0 prüfen
+	OR	A
+	JR	NZ, OFFSET_SHIFT_OK
+
+        LD	HL, MSGOFFSET
+        CALL	PV1
+        DB	ZKOUT
+
+	LD	A, 2		; zwei Stellen
+	CALL	INPUT_HEX
+
+	; abspeichern
+	LD	A, L
+	LD	(IY + PAR_OFFSET), A
+
+	; Shift noch eingeben
+        LD	HL, MSGSHIFT
+        CALL	PV1
+        DB	ZKOUT
+
+	LD	A, 1		; zwei Stellen
+	CALL	INPUT_DECIMAL
+
+	; abspeichern
+	LD	A, L
+	LD	(IY + PAR_SHIFT), A
+
+OFFSET_SHIFT_OK:
+
+
 	; mehr als 1 Segment?
 	; (weniger als 2 Segmente)
 	LD	A, (IY + PAR_SEGMENTSL)
@@ -408,57 +480,61 @@ SLOTRDY:
         DB	ZKOUT
 
 	; Prüfsummen über die einzelnen Segmente
-	LD	A, (IY + PAR_SEGMENTSL)
-        LD      b, A        ; Zähler
-        LD      c, 0        ; Segmentnummer
+	LD	B, (IY + PAR_SEGMENTSH)
+	LD	C, (IY + PAR_SEGMENTSL)
+	LD	DE, 0	; Index
+	LD	(INDEX), DE
 MLOOP:
-        push    bc
-        call    SET_SEGMENT
+        PUSH    BC
         
 	; Zeile freimachen
 	CALL	CLRLINE 
+	
 	; Index ausgeben
-	POP	BC
-	PUSH	BC
-	PUSH	AF
-	LD	A, C
-	CALL    PV1
-        DB      AHEX
-        CALL    PV1
-        DB      SPACE
-	POP	AF
+	LD	HL, (INDEX)
+	CALL	PRINT_HL8_16
+	
+	; Index zu Steuerbyte (und aktivieren)
+        call    SET_SEGMENT
 
 	; Steuerbyte ausgeben
-	CALL    PV1
-        DB      AHEX
+	CALL	PRINT_HL8_16
+
         CALL    PV1
         DB      SPACE
         
         LD      HL, 0C000h  ; Startadresse
-        LD      BC, 02000h  ; Anzahl
+	CALL	CALC_LENGTH ; Anzahl
 	LD      DE, 00000h  ; Startwert
         CALL    CHSUM
-        EX      de, hl      ; Ergenbis nach HL
+        EX      DE, HL      ; Ergenbis nach HL
 
         CALL    PV1         ; ausgeben
         DB      HLHX
-        CALL    PV1
-        DB      SPACE
         
         LD      HL, 0C000h  ; Startadresse
-        LD      BC, 02000h  ; Anzahl
+	CALL	CALC_LENGTH ; Anzahl
 	LD	DE, 0FFFFh  ; Startwert
         CALL    CRCSUM
-        EX      de, hl      ; Ergenbis nach HL
+        EX      DE, HL      ; Ergenbis nach HL
 
         CALL    PV1         ; ausgeben
         DB      HLHX
         CALL    PV1
         DB      CRLF
 
-        pop     bc
-        inc     c
-        djnz    MLOOP
+        POP     BC
+	
+	; Index erhöhen
+	LD	HL, (INDEX)
+	INC	HL
+	LD	(INDEX), HL
+
+        DEC	BC
+	LD	A, B
+	OR	C
+
+        JR	NZ, MLOOP
 
 
 NOSINGLE:
@@ -468,27 +544,38 @@ NOSINGLE:
         CALL	PV1
         DB	ZKOUT
 
-	LD	A, (IY + PAR_SEGMENTSL)
-        LD      b, A        ; Zähler
-        LD      c, 0        ; Segmentnummer
+	LD	B, (IY + PAR_SEGMENTSH)
+	LD	C, (IY + PAR_SEGMENTSL)
+	LD	DE, 0	    ; Index
+	LD	(INDEX), DE
 	LD      DE, 00000h  ; Startwert
 MLOOP2:
         PUSH    BC
 
 	call	FIX_CURSO
+	LD	HL, (INDEX)
         call    SET_SEGMENT
         
 	; Steuerbyte ausgeben
 	CALL    PV1
-        DB      AHEX
+        DB      HLHX
         
         LD      HL, 0C000h  ; Startadresse
-        LD      BC, 02000h  ; Anzahl
+	CALL	CALC_LENGTH ; Anzahl
         CALL    CHSUM
 
         POP     BC
-        INC     C
-        djnz    MLOOP2
+	
+	; Index erhöhen
+	LD	HL, (INDEX)
+	INC	HL
+	LD	(INDEX), HL
+        
+	; Schleifenzähler
+	DEC	BC
+	LD	A, B
+	OR	C
+        JR	NZ, MLOOP2
 
         EX      DE, HL      ; Ergenbis nach HL
 
@@ -498,38 +585,56 @@ MLOOP2:
         CALL    PV1
         DB      CRLF
         
+
 	; Prüfsumme CRC über alle Segmente
 	LD	HL, MSGCRC
         CALL	PV1
         DB	ZKOUT
 
-	LD	A, (IY + PAR_SEGMENTSL)
-        LD      b, A        ; Zähler
-        LD      c, 0        ; Segmentnummer
+	LD	B, (IY + PAR_SEGMENTSH)
+	LD	C, (IY + PAR_SEGMENTSL)
+	LD	DE, 0	    ; Index
+	LD	(INDEX), DE
 	LD      DE, 0FFFFh  ; Startwert
 MLOOP3:
         PUSH    BC
 
 	call    FIX_CURSO
+	LD	HL, (INDEX)
         call    SET_SEGMENT
         
 	; Steuerbyte ausgeben
 	CALL    PV1
-        DB      AHEX
+        DB      HLHX
         
         LD      HL, 0C000h  ; Startadresse
-        LD      BC, 02000h  ; Anzahl
+	CALL	CALC_LENGTH ; Anzahl
         CALL    CRCSUM
 
         POP     BC
-        INC     C
-        djnz    MLOOP3
+	
+	; Index erhöhen
+	LD	HL, (INDEX)
+	INC	HL
+	LD	(INDEX), HL
+
+	; Schleifenzähler
+        DEC	BC
+	LD	A, B
+	OR	C
+        JR	NZ, MLOOP3
 
         EX      DE, HL      ; Ergenbis nach HL
 
-	call	FIX_CURSO
+	CALL	FIX_CURSO
         CALL    PV1         ; ausgeben
         DB      HLHX
+
+	; CRC suchen und Zeichenkette ausgeben
+	CALL	SEARCH_CRC
+        CALL    PV1
+        DB      ZKOUT
+
         CALL    PV1
         DB      CRLF
 	CALL	CLRLINE 
@@ -558,6 +663,349 @@ NOROMMOD:
 	
 	RET
 
+	; Anzahl/Länge aus Segmentgröße
+	; berechnen
+	; Parameter
+	; IY = Zeiger auf genutzte Struktur
+	; Rückgabe
+	; BC = Anzahl der Bytes
+CALC_LENGTH:
+	PUSH	HL
+	PUSH	DE
+        LD	B, (IY + PAR_SEGSIZE)
+	LD	HL, 0
+	LD	DE, 1024
+
+CALC_NEXT:
+	ADD	HL, DE
+	DJNZ	CALC_NEXT
+
+	LD	B, H
+	LD	C, L
+
+	POP	DE
+	POP	HL
+	RET
+
+	; Abschalten vom CAOS-ROM
+CAOS_OFF:
+	DI
+	; PIO A, 88H, Bit 0 löschen
+	IN	A,(88H)
+	AND	7EH
+	OUT	(88H), A
+	RET
+
+	; Anschalten vom CAOS-ROM
+CAOS_ON:
+	; PIO A, 88H, Bit 0 setzen
+	IN	A,(88H)
+	OR 	01H
+	OUT	(88H), A
+	EI
+	RET
+
+	; Eingabe einer Zahl
+	; Parameter
+	; A = max. Anzahl Stellen
+	; Rückgabe
+	; HL -> Dezimalzahl
+	; CY = 1 -> Abbruch
+	
+	; ESC		Abbruch
+	; STOP		Abbruch
+	; Ctrl-C	Abbruch
+	; Enter		Umwandlung
+	; Ziffern	Eingabe
+	; CUL		= Backspace
+	; Backspace	= Backspace
+INPUT_DECIMAL:
+	
+	LD	C, A	; noch Stellen
+	LD	B, 0	; Position
+
+        ; auf Taste warten
+IN_DEC_KEYIN:
+	CALL 	PV1
+        DB 	KBD
+
+	CP	ESC
+	JR	Z, IN_DEC_END
+
+	CP	BREAK
+	JR	Z, IN_DEC_END
+
+	CP	STOP
+	JR	Z, IN_DEC_END
+
+	CP	CR
+	JR	Z, IN_DEC_DECODE
+
+
+	CP	CUL
+	JR	Z, IN_DEC_CLRBS
+
+	CP	BCLR
+	JR	Z, IN_DEC_CLRBS
+
+
+	CP	'0'
+	JR	C, IN_DEC_KEYIN
+
+	CP	'9'+1
+	JR	NC, IN_DEC_KEYIN
+
+	; Anzahl prüfen
+	LD	D, A
+	LD	A, C
+	OR	A
+	LD	A, D
+	JR	Z, IN_DEC_KEYIN
+
+	INC	B
+	DEC	C
+
+	; endlich Zeichen ausgeben
+	CALL	PV1
+	DB	CRT
+
+	JR	IN_DEC_KEYIN
+
+IN_DEC_CLRBS:
+	; Position prüfen
+	LD	A, B
+	OR	A
+	JR	Z, IN_DEC_KEYIN
+
+	INC	C
+	DEC	B
+
+	LD	A, BCLR
+	CALL	PV1
+	DB	CRT
+
+	JR	IN_DEC_KEYIN
+
+IN_DEC_DECODE:  
+	; Cursor auf Anfang der Eingabe stellen
+	PUSH	BC
+	
+	LD	A, CUL
+IN_DEC_FIXC:	
+	CALL	PV1
+	DB	CRT
+
+	DJNZ	IN_DEC_FIXC
+	
+	POP	BC
+
+	; vorbereiten
+	LD	HL, 0	; Ergebnis
+	LD	D, 0	; Hi-Teil für Addition
+
+IN_DEC_NEXT_DIGIT:
+	CALL	MUL_HL_10
+
+	CALL	READ_CHAR
+
+	LD	E, A
+	ADD	HL, DE
+
+	; nach rechts rücken
+	LD	A, CUR
+	CALL	PV1
+	DB	CRT
+
+	DJNZ	IN_DEC_NEXT_DIGIT
+
+	SCF
+	CCF
+	RET
+
+IN_DEC_END:
+	SCF
+	RET
+
+
+
+	; Eingabe einer Zahl
+	; Parameter
+	; A = max. Anzahl Stellen
+	; Rückgabe
+	; HL -> Hexadezimalzahl
+	; CY = 1 -> Abbruch
+	
+	; ESC		Abbruch
+	; STOP		Abbruch
+	; Ctrl-C	Abbruch
+	; Enter		Umwandlung
+	; Ziffern	Eingabe
+	; A-F    	Eingabe
+	; a-f    	Eingabe
+	; CUL		= Backspace
+	; Backspace	= Backspace
+INPUT_HEX:
+	
+	LD	C, A	; noch Stellen
+	LD	B, 0	; Position
+
+        ; auf Taste warten
+IN_HEX_KEYIN:
+	CALL 	PV1
+        DB 	KBD
+
+	CP	ESC
+	JR	Z, IN_HEX_END
+
+	CP	BREAK
+	JR	Z, IN_HEX_END
+
+	CP	STOP
+	JR	Z, IN_HEX_END
+
+	CP	CR
+	JR	Z, IN_HEX_DECODE
+
+
+	CP	CUL
+	JR	Z, IN_HEX_CLRBS
+
+	CP	BCLR
+	JR	Z, IN_HEX_CLRBS
+
+
+	CP	'0'
+	JR	C, IN_HEX_KEYIN
+
+	CP	'F'+1
+	JR	NC, IN_HEX_KEYIN
+
+	; Anzahl prüfen
+	LD	D, A
+	LD	A, C
+	OR	A
+	LD	A, D
+	JR	Z, IN_HEX_KEYIN
+
+	INC	B
+	DEC	C
+
+	; endlich Zeichen ausgeben
+	CALL	PV1
+	DB	CRT
+
+	JR	IN_HEX_KEYIN
+
+IN_HEX_CLRBS:
+	; Position prüfen
+	LD	A, B
+	OR	A
+	JR	Z, IN_HEX_KEYIN
+
+	INC	C
+	DEC	B
+
+	LD	A, BCLR
+	CALL	PV1
+	DB	CRT
+
+	JR	IN_HEX_KEYIN
+
+IN_HEX_DECODE:  
+	; Cursor auf Anfang der Eingabe stellen
+	PUSH	BC
+	
+	LD	A, CUL
+IN_HEX_FIXC:	
+	CALL	PV1
+	DB	CRT
+
+	DJNZ	IN_HEX_FIXC
+	
+	POP	BC
+
+	; vorbereiten
+	LD	HL, 0	; Ergebnis
+	LD	D, 0	; Hi-Teil für Addition
+
+IN_HEX_NEXT_DIGIT:
+	CALL	MUL_HL_16
+
+	CALL	READ_CHAR
+
+	LD	E, A
+	ADD	HL, DE
+
+	; Cursor nach rechts rücken
+	LD	A, CUR
+	CALL	PV1
+	DB	CRT
+
+	DJNZ	IN_HEX_NEXT_DIGIT
+
+	SCF
+	CCF
+	RET
+
+IN_HEX_END:
+	SCF
+	RET
+
+
+	; liest ASCII Zeichen von
+	; Cursorposition
+	; Umwandlung in dez. bzw. hex-Wert
+READ_CHAR:
+	PUSH	HL
+	PUSH	DE
+
+	LD	HL, CURSO
+	LD	E, (HL)
+	INC	HL
+	LD	D, (HL)
+
+	CALL	PV1	; D = Zeile, E = Spalte
+	DB	DABR	; HL = ASCII-Addr
+
+	LD	A, (HL)
+
+	CP	'A'
+	JR	C, RC_DIGIT
+
+	; Buchstaben
+	RES	5, A	; Klein -> Großbuchstaben
+	SUB	7	; hinter 9 schieben
+
+RC_DIGIT:	
+	SUB	'0'
+
+	POP	DE
+	POP	HL
+	RET
+
+	; multipliziert HL
+	; mit 10
+MUL_HL_10:
+	PUSH	DE
+
+	LD	D, H
+	LD	E, L
+
+	ADD	HL, HL
+	ADD	HL, HL
+	ADD	HL, HL
+	ADD	HL, DE
+	ADD	HL, DE
+
+	POP	DE
+	RET
+
+MUL_HL_16:
+	ADD	HL, HL
+	ADD	HL, HL
+	ADD	HL, HL
+	ADD	HL, HL
+	RET
 
 	;------------------------------
         ; Parameter
@@ -566,6 +1014,7 @@ NOROMMOD:
 	; DE = Startwert
         ; Ergebnis -> DE
 CHSUM:
+	CALL	CAOS_OFF
 
 	; Vorbereitung Schleifenzähler
 	; für schnelle Zählroutine
@@ -586,6 +1035,7 @@ CHSUM_DEC:
         djnz    CHSUM_LP
 	dec     c
         jr      nz, CHSUM_LP
+	CALL	CAOS_ON
         ret
         
                     
@@ -597,6 +1047,7 @@ CHSUM_DEC:
 	; DE = Startwert
         ; Ergebnis -> DE
 CRCSUM:
+	CALL	CAOS_OFF
         ; Vorbereitung Schleifenzähler, Alternative ohne Modifikation DE
 				; A  F  B  C   D  E   H  L
 				;       Lh Ll         Sh Sl	; Start
@@ -639,19 +1090,21 @@ CRCSUM_LP:
         ld   e, a
         inc  hl         ; Addresse++
 	djnz CRCSUM_LP
-        ;dec  bc         ; Laenge--
-        ;or   c          ; pruefen auf BC = 0
 	dec   c
         jr   nz, CRCSUM_LP
+	CALL	CAOS_ON
         ret
 
 	;------------------------------
         ; Parameter:
-        ;   C - Segmentnummer  
-	; TODO -> aufbohren auf 16 Bit
+        ;   HL - Segmentnummer  
 	; Rückgabe:
-	;   A - Steuerbyte
+	;   HL - Steuerbyte
 SET_SEGMENT:
+	PUSH	AF
+	PUSH    BC
+	PUSH	DE
+
 	LD	B, (IY + PAR_SHIFT)
 
 	; shiften
@@ -661,25 +1114,40 @@ SHIFT_NEXT:
 	JR	Z, SHIFT_READY
 	DEC	B
 	LD	A, C 	; Segmentnummer
-	RLCA
-	LD	C, A
+	SLA	L
+	RL      H
 	JR	SHIFT_NEXT
 SHIFT_READY:
 	; und Offset addieren
-	LD	A, (IY + PAR_OFFSET)
-	ADD	C
-	; jetzt Steuerbyte in A
+	LD	B, 0
+	LD	C, (IY + PAR_OFFSET)
+	ADD	HL, BC
+	; jetzt Steuerbyte in HL
+
 	; und Modul schalten
-	push	af
-	push	de
+	PUSH	HL
+
+        LD      D, L        ; Steuerbyte
         LD      HL, SLOT
-        LD      D, A        ; Steuerbyte
         LD      L, (HL)     ; Steckplatz
         LD      A, 2
         CALL    PV1
         DB      MODU
-	pop	de
-	pop	af
+
+
+	POP	HL
+	POP	DE
+
+	; zusätzliches Steuerbyte
+        LD      A, (SLOT)     ; Steckplatz
+	LD	B, A
+	LD	C, 081h
+
+	LD	A, L
+	OUT	(C), A
+
+	POP	BC
+	POP	AF
 	RET
 
 
@@ -689,8 +1157,7 @@ FIX_CURSO:
 	PUSH    HL
 	LD	HL, CURSO
 	LD	A, (HL)
-	DEC	A
-	DEC	A
+	SUB	A, 5
 	LD	(HL), A
 	POP	HL
 	RET
@@ -712,6 +1179,7 @@ CLRLINE:
 	; Ergebnis
 	; IY - Zeiger auf Modulstruktur
 MOD_ID:
+	PUSH	HL
 	PUSH	DE
 	PUSH	BC
 	LD	DE, PAR_SIZE
@@ -733,8 +1201,19 @@ NEXT_ID:
 	JR	NEXT_ID
 
 ID_FOUND:
+	; alles nach PARSET umkopieren
+	PUSH	IY
+	POP	HL
+	LD	DE, PARSET
+	LD	BC, PAR_SIZE
+	LDIR
+	LD	HL, PARSET
+	PUSH	HL
+	POP	IY
+
 	POP	BC
 	POP	DE
+	POP	HL
 	RET
 
 
@@ -762,16 +1241,49 @@ m_loop:
         djnz	m_loop
         
         ret
+	
+	;------------------------------
+	; Ausgabe HL als 8 oder 16-Bit-Zahl
+	; Parameter
+	; HL = Hexwert
+PRINT_HL8_16:
+	PUSH	AF
 
-;------------------------------
-; Ausgabe HL als Dezimalzahl
-; Erweitert: Vornullen werden unterdrückt und Register gesichert
-;https://wikiti.brandonw.net/index.php?title=Z80_Routines:Other:DispHL
-;Number in hl to decimal ASCII
-;Thanks to z80 Bits
-;inputs:	hl = number to ASCII
-;example: hl=300 outputs '00300'
-;destroys: af, bc, hl, de used
+	LD	A, H
+	OR	A
+	JR	NZ, HL16
+
+
+	CALL	PV1
+	DB	SPACE
+
+	CALL	PV1
+	DB	SPACE
+	
+	LD	A, L
+
+	CALL	PV1
+	DB	AHEX
+
+	CALL	PV1
+	DB	SPACE
+HL_END:
+	POP	AF
+	RET
+HL16:
+	CALL	PV1
+	DB	HLHX
+	JR	HL_END
+
+	;------------------------------
+	; Ausgabe HL als Dezimalzahl
+	; Erweitert: Vornullen werden unterdrückt und Register gesichert
+	;https://wikiti.brandonw.net/index.php?title=Z80_Routines:Other:DispHL
+	;Number in hl to decimal ASCII
+	;Thanks to z80 Bits
+	;inputs:	hl = number to ASCII
+	;example: hl=300 outputs '00300'
+	;destroys: af, bc, hl, de used
 DispHL:
 	PUSH	AF
 	PUSH	HL
@@ -818,18 +1330,75 @@ Num2:	inc	a
 	DB	CRT
 	ret 
 
+	
+	;------------------------------
+	; Suche nach passendem CRC in Liste
+	; Parameter
+	; HL = zu suchender CRC
+	; Rückgabe
+	; HL = Zeiger auf Zeichenkette
+SEARCH_CRC:
+	PUSH	BC
+	PUSH	DE
+	EX 	DE, HL
+	LD	HL, CRC_LIST
+
+	LD	C, (HL)
+	INC	HL
+	LD	B, (HL)
+	INC	HL
+
+SEARCH_CMP:
+	; clear carry
+	OR	A
+	EX 	DE, HL
+	SBC	HL, BC
+	JR	Z, SEARCH_FND
+	ADD	HL, BC
+	EX 	DE, HL
+
+	; Ende der ZK suchen
+	XOR	A
+SEARCH_NXT:
+	CP	(HL)
+	INC	HL
+	JR	NZ, SEARCH_NXT
+
+	; zeigt auf nächsten CRC
+	LD	C, (HL)
+	INC	HL
+	LD	B, (HL)
+	INC	HL
+	
+	; schon Ende?
+	LD	A, B
+	OR	C
+
+	JR	NZ, SEARCH_CMP
+	EX 	DE, HL
+
+SEARCH_FND:
+	EX 	DE, HL
+	; HL zeigt auf Zeichenkette
+
+	POP	DE
+	POP	BC
+	RET
+
+	
+
 
 ;------------------------------
 ; data segment
 ; ab hier nur Datenstrukturen
 
-MSGUNKOWN:
-	DB	"kein ROM", 0
-MSG_01:	DB	"Autostart", 0
-MSG_ROM1:DB	"segmented ROM ", 0
-MSG_ROM2:DB	"USER ROM ", 0
-MSG_ROM3:DB	"PROM ", 0
-MSG_ROM4:DB	"M052 ", 0
+MSGUNKOWN:	DB	"kein ROM", 0
+MSG_01:		DB	"Autostart", 0
+MSG_ROM1:	DB	"segmented ROM ", 0
+MSG_ROM2:	DB	"USER ROM ", 0
+MSG_ROM3:	DB	"PROM ", 0
+MSG_ROM4:	DB	"M052 ", 0
+MSG_ROM5:	DB	"Flash ", 0
 
 PAR_SIZE:	EQU 8	; Länge eines Eintrags
 ; Definition der jeweilgen Offsets
@@ -899,6 +1468,14 @@ PAR_LIST:
 	DB	0	; Shift
 	DW	MSG_ROM1
 
+	; flash ROM, M044
+	DB	0x76	; Strukturbyte
+	DB	8	; kByte
+	DW	0  	; Segmente
+	DB	0	; Offset
+	DB	0	; Shift
+	DW	MSG_ROM5
+
 	; M025/M040
 	DB	0xF7	; Strukturbyte
 	DB	8	; kByte
@@ -948,6 +1525,39 @@ PAR_LIST:
 	DB	0	; Shift
 	DW	MSGUNKOWN
 
+
+CRC_LIST:
+	DW	0x1C01
+	DB	"BM600", 0
+
+	DW	0xD34A
+	DB	"BM601", 0
+
+	DW	0x6CD1
+	DB	"M006 BASIC", 0
+
+	DW	0xD30E
+	DB	"M033 TYPESTAR", 0
+
+	DW	0x1DD1
+	DB	"M012 TEXOR", 0
+
+	DW	0x08FE
+	DB	"M026 FORTH", 0
+
+	DW	0xD76F
+	DB	"M027 DEVELOPMENT", 0
+
+	DW	0xC20C
+	DB	"M052 USB 2.2", 0
+
+	DW	0x3FA4
+	DB	"M052 USB 3.0", 0
+
+	DW	0
+	DB	"---", 0
+
+
 MSGSTART:
         DB      CLL
 	DB	"ROM-checker, ", 0
@@ -969,24 +1579,30 @@ MSGSEGMENTS:
 	DB      CR, LF, CLL
 	DB      "Segmente: ", 0
 
+MSGOFFSET: 
+	DB      "Offset (hex): ", 0
+
+MSGSHIFT: 
+	DB      CR, LF, CLL
+	DB      "Shift: ", 0
+
 MSGNOMODUL:
 	DB      CR, LF, CLL
 	DB	"Kein Modul gefunden!"
-	;DB	CR, LF, CLL
 	DB	0
 
 MSGHEADER:
         DB      CR, LF, CLL
-	DB	"IX CB SUM   CRC"   
+	DB	"idx  ctrl  SUM  CRC"   
         DB      CR, LF, CLL
-	DB      "-- -- ----  ----"
+	DB      "---- ----  ---- ----"
 	DB      CR, LF, CLL, 0
 MSGSUM:   
         DB      CLL
-	DB	"SUM 00" , 0
+	DB	"SUM 0000 " , 0
 MSGCRC:   
         DB      CLL
-	DB	"CRC 00" , 0
+	DB	"CRC 0000 " , 0
 
 MSGSUMHELP:
         DB      CLL
@@ -1003,7 +1619,9 @@ include "date.inc"
 
 ;------------------------------
 ; data segment
-SLOT:   DB  0
+SLOT:   DB  	0
+INDEX:	DW	0
+PARSET:	DS  	PAR_SIZE
 
 
 	; fill up with 0xff
@@ -1011,7 +1629,7 @@ SLOT:   DB  0
 	;DS	ALIGN2, 0xff
 	; jeweils 128 (0x80) hinzufügen, bei asm-Fehler
 	;ds	(14 * 0x80) - $
-	ds	0x700 - $
+	ds	0xA00 - $
 KCCEND:
 
 ; vim: set tabstop=8 noexpandtab:

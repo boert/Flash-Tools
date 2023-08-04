@@ -8,6 +8,33 @@ Zum Vergleich können die Prüfsummen auch von einem Python-Skript für den PC e
 ![Screenshot](Bilder/flashcheck_pc.png)
 
 Das KC85-Programm enthält folgende Programmmodule:
+
+## SUM
+
+Mit dem Programm SUM läßt sich die einfache Prüfsumme (SUM16) über einen bestimmten Speicherbereich ermitteln.
+Als Parameter werden die Startadresse und die Länge benötigt.
+Optional läßt sich ein Startwert angeben. Damit läßt sich die Prüfsumme über mehrere Speicherbereiche ermitteln.
+Für das Aktivieren der richtigen Speicherbereiche (SWITCH) ist der Anwender verantwortlich.
+
+Das Beispiel erzeugt die Prüfsumme über den RAM-Bereich von 4000h bis 4FFFh:
+
+```
+SUM 4000 1000
+```
+
+## CRC
+
+Mit dem Programm CRC läßt sich die Prüfsumme (CRC16) über einen bestimmten Speicherbereich ermitteln.
+Als Parameter werden die Startadresse und die Länge benötigt.
+Optional läßt sich ein Startwert angeben. Damit läßt sich die Prüfsumme über mehrere Speicherbereiche ermitteln.
+Für das Aktivieren der richtigen Speicherbereiche (SWITCH) ist der Anwender verantwortlich.
+
+Das Beispiel erzeugt die CRC-Prüfsumme über den ROM-Bereich von C000h bis DFFFh und verwendet als Startwert 55AAh:
+
+```
+CRC C000 2000 55AA
+```
+
 ## ROMSEARCH
 
 ROMSEARCH durchsucht den kompletten KC85 (Mühlhausen-KC85/4 oder KC85/5) nach ROM-Modulen. Wird ein Modul gefunden erfolgt die Ausgabe der Schachtnummer, des Strukturbytes und bei ROM-Modulen der Typ und die Größe.
@@ -28,30 +55,21 @@ Beispielausgabe für ein M047 mit 16 ROM Segmenten:
 Beispielausgabe für ein M052 mit vier ROM Segmenten:
 ![Screenshot](Bilder/romcheck_M052.png)
 
+## CAOSCHECK
 
-## SUM
-Mit dem Programm SUM läßt sich die einfache Prüfsumme (SUM16) über einen bestimmten Speicherbereich ermitteln.
-Als Parameter werden die Startadresse und die Länge benötigt.
-Optional läßt sich ein Startwert angeben. Damit läßt sich die Prüfsumme über mehrere Speicherbereiche ermitteln.
-Für das Aktivieren der richtigen Speicherbereiche (SWITCH) ist der Anwender verantwortlich.
+Dieser Programmteil ermittelt die Prüfsummen (CRC) zu allen System-ROMs im jeweiligen System. Es funktioniert ab CAOS 3.1 (KC85/3):
+![Screenshot](Bilder/caoscheck31.png)
 
-Das Beispiel erzeugt die Prüfsumme über den RAM-Bereich von 4000h bis 4FFFh:
+Für CAOS 4.2 auf einem KC85/4 ergibt sich das folgende Bild:
+![Screenshot](Bilder/caoscheck42.png)
 
-```
-SUM 4000 1000
-```
+Wurde der KC85 zu einem 85/5 aufgerüstet, bekommt man folgende Ausgabe:
+![Screenshot](Bilder/caoscheck48.png)
 
-## CRC
-Mit dem Programm CRC läßt sich die Prüfsumme (CRC16) über einen bestimmten Speicherbereich ermitteln.
-Als Parameter werden die Startadresse und die Länge benötigt.
-Optional läßt sich ein Startwert angeben. Damit läßt sich die Prüfsumme über mehrere Speicherbereiche ermitteln.
-Für das Aktivieren der richtigen Speicherbereiche (SWITCH) ist der Anwender verantwortlich.
+Sollen alle vier Segmente des USER-ROM eines KC85/5 geprüft werden, kann dafür der Befehl ROMCHECK mit dem Parameter 02 verwendet werden:
+![Screenshot](Bilder/romcheck02.png)
 
-Das Beispiel erzeugt die CRC-Prüfsumme über den ROM-Bereich von C000h bis DFFFh und verwendet als Startwert 55AAh:
 
-```
-CRC C000 2000 55AA
-```
 
 # Parameter der ROM-Module
 
@@ -76,7 +94,7 @@ M052  | USB + Netzwerk         | FD           |  8k          |  4       | AAASSP
 
 [^1]: Beim Modul M046 müssen statt der Brücken RB02 und RB04 die Brücken RB03 und RB05 gesteckt werden, damit die hier beschriebene Ansteuerung funktioniert.
 
-Um das Steuerbyte für ein bestimmtesROM- Segment zu ermitteln, wird die Segmentnummer um den Betrag Shift nach links verschoben und auf das Basisbyte addiert.
+Um das Steuerbyte für ein bestimmtes ROM- Segment zu ermitteln, wird die Segmentnummer um den Betrag Shift nach links verschoben und auf das Basisbyte addiert.
 
 Beispiel: Gesucht wird das Steuerbyte um im Modul M052 das zweite ROM-Segment auf Adresse C000h einzublenden.
 

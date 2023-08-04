@@ -1,7 +1,14 @@
-
+; TODO:
+; 1. BRKT
+; 2. Menüwortsuche (7f)
+; 3. Speicherbytes (bei Segment)
+;
+; Fehler:
+; 4. Parameteranzahl klappt unter 3.1 nicht
 ;---------------------------------------- 
 
 PV1:    EQU     0F003h	; Sprungverteiler
+CAOSVER: EQU	0EDFFh	; CAOS-Version (ab 4.1) 
 
 
 ; CAOS Funktionsnummern
@@ -332,6 +339,16 @@ SLOTRDY:
         CALL    PV1
         DB      AHEX
 
+	; CAOS USER-ROM?
+	LD	A, (SLOT)
+	CP	2
+	JR	Z, GO_MOD
+
+	; 85/3?
+	CALL	CAOS_VERSION
+	CP	0x31
+	CALL	Z, BASIC_OFF
+
 	; Strukturbyte lesen
 	LD	A, (SLOT)
 	LD	L, A
@@ -347,6 +364,7 @@ SLOTRDY:
 	JP	Z, NOMOD
 	
 	; Strukturbyte suchen/prüfen
+GO_MOD:
 	CALL	MOD_ID
 	
 	; Strukturbyte ausgeben
@@ -690,6 +708,10 @@ CALC_NEXT:
 	; Abschalten vom CAOS-ROM
 CAOS_OFF:
 	DI
+        LD	A, (IY + PAR_SEGSIZE)
+	CP	9
+	RET	C
+	; nur abschalten, wenn größer 8k
 	; PIO A, 88H, Bit 0 löschen
 	IN	A,(88H)
 	AND	7EH
@@ -1385,7 +1407,370 @@ SEARCH_FND:
 	POP	BC
 	RET
 
+
+	; Schaltet BASIC weg
+	; (nur im 85/3 relevant)
+BASIC_OFF:
+	LD	A, 2
+	LD	L, 2
+	LD	D, 0
+
+	CALL	PV1
+	DB	MODU
 	
+	RET
+
+
+
+; different CAOS version
+; to different hardware options
+;
+; System   CAOS            ROM E   ROM F   ROM C   BASIC C M022    EDFFh (ver)
+; HC 900   HC-CAOS 900     2kB     2kB     %       %       ja      nein
+; KC85/2   HC-CAOS 2.2     2kB     2kB     %       %       ja      nein
+; KC85/3   HC-CAOS 3.1     8kB     %       %       8kB     ja      nein
+; KC85/4   KC-CAOS 4.1     8kB     %       4kB     8kB     nein    41
+; KC85/4   KC-CAOS 4.2     8kB     %       4kB     8kB     nein    42
+; KC85/5   KC-CAOS 4.3...  8kB     %       8kB     32kB    nein    43
+	
+
+	; -------------------- 
+        ; Menüwort 5
+        DW	07F7Fh
+        DB	"CAOSCHECK"
+        DB	01h
+	
+
+	; defaults
+	LD	HL, 8192
+	LD	(ROME_LEN), HL
+	LD	HL, 0
+	LD	(ROMF_LEN), HL
+	LD	(ROMC_LEN), HL
+	LD	(USRC_LEN), HL
+	LD	IY, PARSET
+	LD	A, 8
+	LD	(IY + PAR_SEGSIZE), A
+
+	CALL	CAOS_VERSION
+
+	CP	0x22
+	JR	Z, V22
+	
+	LD	HL, 8192
+	LD	(USRC_LEN), HL
+
+	CP	0x31
+	JR	Z, V31
+
+	CP	0x40
+	JR	C, UNKNOWN
+
+	CP	0x43
+	JR	C, V4
+
+	JR	V5
+
+UNKNOWN:
+        CALL	PV1
+        DB	AHEX
+
+	LD	HL, MSG_UN
+        CALL	PV1
+        DB	ZKOUT
+	
+	RET
+
+
+V22:
+	LD	HL, 2048
+	LD	(ROME_LEN), HL
+	LD	(ROMF_LEN), HL
+	LD	A, '2'
+
+	CALL	PV1
+	DB	OSTR
+	DB	'Sorry, CAOS version not supported.', 0x0d, 0x0a, 0 
+	RET
+	;JR	EVALROMS
+
+V31:
+	LD	A, '3'
+	JR	EVALROMS
+
+V4:	
+	LD	HL, 4096
+	LD	(ROMC_LEN), HL
+	LD	A, '4'
+	JR	EVALROMS
+
+V5:
+	LD	HL, 8192
+	LD	(ROMC_LEN), HL
+	LD	A, '5'
+
+EVALROMS:
+	PUSH	AF
+
+	LD	HL, MSG_CC
+        CALL	PV1
+        DB	ZKOUT
+
+        LD	HL, BUILDSTR
+        CALL	PV1
+        DB	ZKOUT
+
+        LD	HL, MSGSYSTEM
+        CALL	PV1
+        DB	ZKOUT
+
+
+	LD	HL, MSG_KC
+        CALL	PV1
+        DB	ZKOUT
+	POP	AF
+
+        CALL	PV1
+        DB	CRT
+
+        CALL	PV1
+        DB	CRLF
+
+	; ROM E
+	LD	HL, MSG_RE
+        CALL	PV1
+        DB	ZKOUT
+
+        LD      HL, 0E000h  ; Startadresse
+	LD	BC, (ROME_LEN); Länge
+	LD	DE, 0FFFFh  ; Startwert
+        CALL    CRCSUM
+        
+	EX      DE, HL      ; Ergenbis nach HL
+
+	PUSH	HL
+        CALL    PV1         ; ausgeben
+        DB      HLHX
+	POP	HL
+
+	; CRC suchen und Zeichenkette ausgeben
+	CALL	SEARCH_CRC
+        CALL    PV1
+        DB      ZKOUT
+
+        CALL    PV1
+        DB      CRLF
+
+	; ROM F
+	LD	HL, (ROMF_LEN)
+	LD	A, L
+	OR	H
+	JR	Z, SKIPF
+
+	LD	HL, MSG_RF
+        CALL	PV1
+        DB	ZKOUT
+
+        LD      HL, 0F000h  ; Startadresse
+	LD	BC, (ROMF_LEN); Länge
+	LD	DE, 0FFFFh  ; Startwert
+        CALL    CRCSUM
+        
+	EX      DE, HL      ; Ergenbis nach HL
+
+	PUSH	HL
+        CALL    PV1         ; ausgeben
+        DB      HLHX
+	POP	HL
+
+	; CRC suchen und Zeichenkette ausgeben
+	CALL	SEARCH_CRC
+        CALL    PV1
+        DB      ZKOUT
+
+        CALL    PV1
+        DB      CRLF
+
+
+SKIPF:
+
+	; ROM C
+	LD	HL, MSG_RC
+        CALL	PV1
+        DB	ZKOUT
+
+	LD	HL, (ROMC_LEN)
+	LD	A, L
+	OR	H
+	JR	Z, SKIP_C
+
+	CALL	ROM_C_ON
+        LD      HL, 0C000h  ; Startadresse
+	LD	BC, (ROMC_LEN); Länge
+	LD	DE, 0FFFFh  ; Startwert
+        CALL    CRCSUM
+        
+	CALL	ROM_C_OFF
+	EX      DE, HL      ; Ergenbis nach HL
+
+	PUSH	HL
+        CALL    PV1         ; ausgeben
+        DB      HLHX
+	POP	HL
+
+	; CRC suchen und Zeichenkette ausgeben
+	CALL	SEARCH_CRC
+        CALL    PV1
+        DB      ZKOUT
+
+        CALL    PV1
+        DB      CRLF
+
+	JR	CHECK_UC
+
+SKIP_C:
+	LD	HL, MSG_NO
+        CALL	PV1
+        DB	ZKOUT
+
+
+	; USER-ROM C
+CHECK_UC:
+	LD	HL, MSG_UC
+        CALL	PV1
+        DB	ZKOUT
+
+	LD	HL, (USRC_LEN)
+	LD	A, L
+	OR	H
+	JR	Z, SKIP_UC
+
+	; Modulstatus auslesen
+	LD	L, 2
+	LD	A, 1
+	CALL	PV1
+	DB	MODU
+
+	; Status wegspeichern
+	PUSH	DE
+
+	; Modul aktivieren
+	LD	L, 2
+	LD	A, 2
+	LD	D, 0xC1
+	CALL	PV1
+	DB	MODU
+
+        LD      HL, 0C000h  ; Startadresse
+	LD	BC, (USRC_LEN); Länge
+	LD	DE, 0FFFFh  ; Startwert
+        CALL    CRCSUM
+	
+	EX      DE, HL      ; Ergenbis nach HL
+
+	PUSH	HL
+        CALL    PV1         ; ausgeben
+        DB      HLHX
+	POP	HL
+
+	; CRC suchen und Zeichenkette ausgeben
+	CALL	SEARCH_CRC
+        CALL    PV1
+        DB      ZKOUT
+
+        CALL    PV1
+        DB      CRLF
+
+	; Status rausholen
+	POP 	DE
+	
+	; Modulstatus wiederherstellen
+	LD	L, 2
+	LD	A, 2
+	CALL	PV1
+	DB	MODU
+	RET
+
+SKIP_UC:
+	LD	HL, MSG_NO
+        CALL	PV1
+        DB	ZKOUT
+
+	RET
+
+
+	; Ermittelt die CAOS-Version
+	; von 2.2 über 3.1 bis 4.8
+	; Parameter
+	;    keine
+	; Rückgabe
+	; A = Versionsnummer
+CAOS_VERSION:
+	LD 	A, ( 0xE011)  	; CAOS 4.1  (and later) has 7F7Fh here
+	CP	0x7F 		; KC85/4?
+	JR 	Z, CAOS41
+    
+	CP 	0xDD            ; CAOS 3.1
+	JR  	Z, CAOS31
+	
+	CP	0x01            ; CAOS 2.2 or HC-900
+	JR  	Z, CAOS22
+
+	LD	A, 0            ; unknonw = Version 0.0
+	RET
+CAOS22:
+	LD	A, 0x22
+	RET
+CAOS31:
+	LD	A, 0x31
+	RET
+CAOS41:
+	LD  	A, ( CAOSVER)
+	RET
+
+
+ROM_C_ON:
+	PUSH	DE
+	CALL	CAOS_VERSION
+	; C mit MODU einschalten
+	CP	0x43
+	LD	D, 1
+	JR	NC, MODU_ROM_C
+	; kein ROM C
+	CP	0x34
+	JR 	C, ROM_C_END
+	; C manuell einschalten
+	LD	A, (IX+4)
+	OR	0x80
+	LD	(IX+4), A
+	OUT	(0x86), A
+	JR	ROM_C_END
+
+ROM_C_OFF:
+	PUSH	DE
+	CALL	CAOS_VERSION
+	; C mit MODU ausschalten
+	CP	0x43
+	LD	D, 0
+	JR	NC, MODU_ROM_C
+	; kein ROM C
+	CP	0x34
+	JR 	C, ROM_C_END
+	; C manuell ausschalten
+	LD	A, (IX+4)
+	AND	0x7F
+	LD	(IX+4), A
+	OUT	(0x86), A
+ROM_C_END:
+	POP	DE
+	RET
+
+MODU_ROM_C:
+	LD	L, 5
+	LD	A, 2
+	CALL	PV1
+	DB	MODU
+	JR	ROM_C_END
 
 
 ;------------------------------
@@ -1419,6 +1804,14 @@ PAR_LIST:
 	DB	0	; Offset	+4
 	DB	0	; Shift		+5
 	DW	MSG_01  ;		+6
+	
+	; USER-ROM
+	DB	0x02	; Strukturbyte	+0
+	DB	8	; kByte		+1
+	DW	4	; Segmente	+2
+	DB	0xC1	; Offset	+4
+	DB	4	; Shift		+5
+	DW	MSG_ROM2;		+6
 
 	;  32k ROM
 	DB	0x70	; Strukturbyte
@@ -1426,7 +1819,7 @@ PAR_LIST:
 	DW	4	; Segmente
 	DB	0xC1	; Offset
 	DB	4	; Shift
-	DW	MSG_ROM1
+	DW	MSG_ROM2
 
 	;  64k ROM (Brücken umsetzen!)
 	DB	0x71	; Strukturbyte
@@ -1448,7 +1841,7 @@ PAR_LIST:
 	DB	0x73	; Strukturbyte
 	DB	16	; kByte
 	DW	16	; Segmente
-	DB	0xC0	; Offset
+	DB	0xC1	; Offset
 	DB	2	; Shift
 	DW	MSG_ROM1
 
@@ -1456,7 +1849,7 @@ PAR_LIST:
 	DB	0x74	; Strukturbyte
 	DB	16	; kByte
 	DW	32	; Segmente
-	DB	0   	; Offset
+	DB	0xC1   	; Offset
 	DB	1	; Shift
 	DW	MSG_ROM1
 
@@ -1551,8 +1944,71 @@ CRC_LIST:
 	DW	0xC20C
 	DB	"M052 USB 2.2", 0
 
+	DW	0xDE90
+	DB	"M052 USB 2.9", 0
+
+	DW	0xA4C5
+	DB	"M052 USB 2.9+Keyb.", 0
+
 	DW	0x3FA4
 	DB	"M052 USB 3.0", 0
+    
+	DW	0x0540
+	DB	"CAOS 4.8 E", 0
+
+	DW	0x1027
+	DB	"CAOS 4.8 C", 0
+
+	DW	0x4F53
+	DB	"CAOS 4.8 USER", 0
+    
+	DW	0xCCCF
+	DB	"CAOS 4.7 E", 0
+
+	DW	0x252D
+	DB	"CAOS 4.7 C", 0
+
+	DW	0x209D
+	DB	"CAOS 4.5 E", 0
+
+	DW	0x59D9
+	DB	"CAOS 4.5 C", 0
+
+	DW	0xE760
+	DB	"CAOS 4.5 USER", 0
+
+	DW	0x79D5
+	DB	"CAOS 4.2 E", 0
+
+	DW	0x47F5
+	DB	"CAOS 4.2 C, BM207", 0
+
+	DW	0x2BCE
+	DB	"CAOS 4.1 E", 0
+
+	DW	0x6AB3
+	DB	"CAOS 4.1 C", 0
+
+	DW	0xE38E
+	DB	"CAOS 4.0 E, selten!", 0
+
+	DW	0x2E8A
+	DB	"CAOS 4.0 C, selten!", 0
+
+	DW	0x67ac
+	DB	"CAOS 3.1 E, BM604", 0
+
+	DW	0x2ea5
+	DB	"CAOS 2.2 E", 0
+
+	DW	0x63e6
+	DB	"CAOS 2.2 F", 0
+
+	DW	0x7b15
+	DB	"HC900 E", 0
+
+	DW	0x00cb
+	DB	"HC900 F", 0
 
 	DW	0
 	DB	"---", 0
@@ -1614,6 +2070,19 @@ MSGCRCHELP:
 	DB	"CRC SADDR LENGTH (START_VALUE)"
 	DB      CR, LF, CLL, 0
 
+MSG_CC:	DB	"CAOS-CRCs", CR, LF, 0
+MSGSYSTEM:  
+	DB      CR, LF, CLL
+	DB      "System: ", 0
+
+MSG_KC:	DB	"KC85/", 0
+MSG_UN:	DB	", unbekannt", CR, LF, 0
+MSG_RE:	DB	"ROM  E: ", 0
+MSG_RF:	DB	"ROM  F: ", 0
+MSG_RC:	DB	"ROM  C: ", 0
+MSG_UC:	DB	"USER C: ", 0
+MSG_NO:	DB	"no", CR, LF, 0
+
 include "date.inc"
 
 
@@ -1622,6 +2091,10 @@ include "date.inc"
 SLOT:   DB  	0
 INDEX:	DW	0
 PARSET:	DS  	PAR_SIZE
+ROME_LEN: DW	0
+ROMF_LEN: DW	0
+ROMC_LEN: DW	0
+USRC_LEN: DW	0
 
 
 	; fill up with 0xff
@@ -1629,7 +2102,7 @@ PARSET:	DS  	PAR_SIZE
 	;DS	ALIGN2, 0xff
 	; jeweils 128 (0x80) hinzufügen, bei asm-Fehler
 	;ds	(14 * 0x80) - $
-	ds	0xA00 - $
+	ds	0xD80 - $
 KCCEND:
 
 ; vim: set tabstop=8 noexpandtab:

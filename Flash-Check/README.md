@@ -5,6 +5,7 @@ Mit diesen Werkzeugen lassen sich zu allen ROM-Modulen bzw. Segementen Prüfsumm
 Als einfache Prüfsumme wird die Summe aller 8-Bit Werte (modulo 2^16) erzeugt (SUM16). Der CRC wird nach CRC16-CCITT gebildet.
 
 Zum Vergleich können die Prüfsummen auch von einem Python-Skript für den PC erzeugt werden. 
+
 ![Screenshot](Bilder/flashcheck_pc.png)
 
 Das KC85-Programm enthält folgende Programmmodule:
@@ -38,6 +39,7 @@ CRC C000 2000 55AA
 ## ROMSEARCH
 
 ROMSEARCH durchsucht den kompletten KC85 (Mühlhausen-KC85/4 oder KC85/5) nach ROM-Modulen. Wird ein Modul gefunden erfolgt die Ausgabe der Schachtnummer, des Strukturbytes und bei ROM-Modulen der Typ und die Größe.
+Außerdem wird das Modul aktiviert und nach dem ersten Menüwort gesucht. Dieses wird ausgegeben.
 
 ![Screenshot](Bilder/romsearch.png)
 
@@ -47,6 +49,8 @@ ROMCHECK ermittelt die Prüfsummen über alle Segmente eines Moduls.
 Als Parameter wird die Schachtnummer benötigt.
 
 Es erflogt die Ausgabe der Schachtnummer, des Strukturbytes, des Modultypes, sowie von Segmentgröße und Zahl der Segmente.
+Außerdem werden die ersten sechs Byte aus jedem Segment angezeigt.
+Falls die Prüfsumme über alle Segmente bekannt ist, wird noch die Bezeichnung des ROM-Inhaltes ausgegeben.
 
 Beispielausgabe für ein M047 mit 16 ROM Segmenten:
 ![Screenshot](Bilder/romcheck_M047.png)
@@ -66,7 +70,7 @@ Für CAOS 4.2 auf einem KC85/4 ergibt sich das folgende Bild:
 Wurde der KC85 zu einem 85/5 aufgerüstet, bekommt man folgende Ausgabe:
 ![Screenshot](Bilder/caoscheck48.png)
 
-Sollen alle vier Segmente des USER-ROM eines KC85/5 geprüft werden, kann dafür der Befehl ROMCHECK mit dem Parameter 02 verwendet werden:
+Sollen alle vier Segmente des USER-ROM eines KC85/5 geprüft werden, kann man dafür den Befehl ROMCHECK mit dem Parameter 02 verwenden:
 ![Screenshot](Bilder/romcheck02.png)
 
 

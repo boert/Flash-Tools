@@ -1,14 +1,10 @@
-; TODO:
-; 1. BRKT
-; 2. Menüwortsuche (7f)
-; 3. Speicherbytes (bei Segment)
-;
-; Fehler:
-; 4. Parameteranzahl klappt unter 3.1 nicht
+; bekannte Fehler:
+; - Parameteranzahl klappt unter CAOS 3.1 nicht
+
 ;---------------------------------------- 
 
 PV1:    EQU     0F003h	; Sprungverteiler
-CAOSVER: EQU	0EDFFh	; CAOS-Version (ab 4.1) 
+CAOSV:  EQU	0EDFFh	; CAOS-Version (ab 4.1) 
 
 
 ; CAOS Funktionsnummern
@@ -25,6 +21,7 @@ HLHX:	EQU	01Ah
 AHEX:	EQU	01Ch
 OSTR:   EQU     023h
 MODU:	EQU	026h
+BRKT:	EQU	02Ah
 SPACE:	EQU	02Bh
 CRLF:	EQU	02Ch
 HOME:	EQU	02Dh
@@ -188,6 +185,12 @@ CRCHELP:
 	LD	C, 0	; Startwert für Slot
 	
 NEXTSLOT:
+	; auf Break testen
+	; ggf. Abbruch
+	CALL	PV1
+	DB	BRKT
+	RET	C
+
 	PUSH	BC
 	CALL	CLRLINE 
 
@@ -230,6 +233,8 @@ NEXTSLOT:
 
 	; kein ROM oder Autostart
 	LD	A, (IY + PAR_STRUCT)
+	CP	1
+	JR	Z, MENUSTR
 	CP	2
 	JR	C, CHKNEXTCR
 
@@ -279,6 +284,15 @@ NEXTSLOT:
 	LD	A, ')'
 	CALL	PV1
 	DB	CRT
+
+	POP	BC
+	PUSH	BC
+
+MENUSTR:
+	; Menüstring suchen + ausgeben
+	POP	BC
+	PUSH	BC
+	CALL	SEARCH_7F
 
 CHKNEXTCR:
 	CALL	PV1
@@ -476,7 +490,7 @@ INPUT_SEGMENTS2:
         CALL	PV1
         DB	ZKOUT
 
-	LD	A, 1		; zwei Stellen
+	LD	A, 1		; eine Stelle
 	CALL	INPUT_DECIMAL
 
 	; abspeichern
@@ -503,7 +517,14 @@ OFFSET_SHIFT_OK:
 	LD	DE, 0	; Index
 	LD	(INDEX), DE
 MLOOP:
-        PUSH    BC
+	
+	; auf Break testen
+	; ggf. Abbruch
+	CALL	PV1
+	DB	BRKT
+	RET	C
+        
+	PUSH    BC
         
 	; Zeile freimachen
 	CALL	CLRLINE 
@@ -538,7 +559,10 @@ MLOOP:
 
         CALL    PV1         ; ausgeben
         DB      HLHX
-        CALL    PV1
+        
+	CALL	BYTES	    ; Speicherinhalte anzeigen
+
+	CALL    PV1
         DB      CRLF
 
         POP     BC
@@ -568,6 +592,12 @@ NOSINGLE:
 	LD	(INDEX), DE
 	LD      DE, 00000h  ; Startwert
 MLOOP2:
+	; auf Break testen
+	; ggf. Abbruch
+	CALL	PV1
+	DB	BRKT
+	RET	C
+
         PUSH    BC
 
 	call	FIX_CURSO
@@ -615,6 +645,12 @@ MLOOP2:
 	LD	(INDEX), DE
 	LD      DE, 0FFFFh  ; Startwert
 MLOOP3:
+	; auf Break testen
+	; ggf. Abbruch
+	CALL	PV1
+	DB	BRKT
+	RET	C
+
         PUSH    BC
 
 	call    FIX_CURSO
@@ -1239,9 +1275,9 @@ ID_FOUND:
 	RET
 
 
-;------------------------------
-; Multiplikation 8 Bit * 16 Bit
-; https://wikiti.brandonw.net/index.php?title=Z80_Routines:Math:Multiplication#16.2A8_multiplication
+    ;------------------------------
+    ; Multiplikation 8 Bit * 16 Bit
+    ; https://wikiti.brandonw.net/index.php?title=Z80_Routines:Math:Multiplication#16.2A8_multiplication
 mult_a_de:
         ld	c, 0
         ld	h, c
@@ -1351,6 +1387,83 @@ Num2:	inc	a
 	CALL	PV1
 	DB	CRT
 	ret 
+
+	;------------------------------
+	; gibt die ersten 6 Bytes vom Segment aus
+BYTES:
+	LD	B, 6
+	LD	HL, 0xC000
+
+BYTE_NEXT:
+	
+	CALL	PV1
+	DB	SPACE
+
+	LD	A, (HL)
+	
+	CALL	PV1
+	DB	AHEX
+
+	INC	HL
+
+	DJNZ	BYTE_NEXT
+	
+	RET
+
+	
+	;------------------------------
+	; Suche nach erstem Menüwort
+	; Parameter
+	; C - Modulschacht
+SEARCH_7F:
+	PUSH	BC
+	PUSH	BC
+
+	; Modul anschalten
+	LD	D, 0xC1
+	LD	L, C
+	LD	A, 2
+	CALL	PV1
+	DB	MODU
+
+	LD	HL, 0xC000
+	LD	BC, 0x2000
+	LD	A, 0x7F
+SEARCH_7FN:
+	CPIR
+	JR	NZ, SEARCH_END
+	CP	(HL)
+	; nur einmal 7f
+	JR	NZ, SEARCH_7FN
+	INC	HL
+
+	CALL	PV1
+	DB	SPACE
+
+	; Ausgabe Menüstring
+	CALL	OUT_MENUSTR
+
+	; nicht gefunden
+SEARCH_END:
+	; Modul abschalten
+	POP	BC	; Slot in C
+	LD	D, 0
+	LD	L, C
+	LD	A, 2
+	CALL	PV1
+	DB	MODU
+	POP	BC
+	RET
+
+	; Ausgabe Menüstring
+OUT_MENUSTR:
+	LD	A, (HL)
+	CP	' '
+	RET	C
+	CALL	PV1
+	DB	CRT
+	INC	HL
+	JR	OUT_MENUSTR
 
 	
 	;------------------------------
@@ -1725,7 +1838,7 @@ CAOS31:
 	LD	A, 0x31
 	RET
 CAOS41:
-	LD  	A, ( CAOSVER)
+	LD  	A, ( CAOSV)
 	RET
 
 
@@ -1779,7 +1892,7 @@ MODU_ROM_C:
 
 MSGUNKOWN:	DB	"kein ROM", 0
 MSG_01:		DB	"Autostart", 0
-MSG_ROM1:	DB	"segmented ROM ", 0
+MSG_ROM1:	DB	"seg. ROM ", 0
 MSG_ROM2:	DB	"USER ROM ", 0
 MSG_ROM3:	DB	"PROM ", 0
 MSG_ROM4:	DB	"M052 ", 0
@@ -2049,9 +2162,9 @@ MSGNOMODUL:
 
 MSGHEADER:
         DB      CR, LF, CLL
-	DB	"idx  ctrl  SUM  CRC"   
+	DB	"idx  ctrl  SUM  CRC   00 01 02 03 04 05"   
         DB      CR, LF, CLL
-	DB      "---- ----  ---- ----"
+	DB      "---- ----  ---- ----  -- -- -- -- -- --"
 	DB      CR, LF, CLL, 0
 MSGSUM:   
         DB      CLL
@@ -2102,7 +2215,7 @@ USRC_LEN: DW	0
 	;DS	ALIGN2, 0xff
 	; jeweils 128 (0x80) hinzufügen, bei asm-Fehler
 	;ds	(14 * 0x80) - $
-	ds	0xD80 - $
+	ds	0xE00 - $
 KCCEND:
 
 ; vim: set tabstop=8 noexpandtab:

@@ -20,7 +20,7 @@ def ror(n, rotations, width = 8):
 
 def calc_sum( data):
     sum = 0
-    for index, d in enumerate( data):
+    for d in data:
         sum += int( d)
     sum %= 65536
     return sum
@@ -58,7 +58,9 @@ while True:
     l = len( chunk)
     if( l < 8192):
         chunk += (bytes.fromhex('ff') * (8192-l))
-    print( "chunk #%02d:  sum: %04X  crc: %04X" % ( chunk_nr, calc_sum( chunk), calc_crc( chunk)))
+    chunk_sum = calc_sum( chunk)
+    chunk_crc = calc_crc( chunk)
+    print( "chunk #%02d:  sum: %04X  crc: %04X" % ( chunk_nr, chunk_sum, chunk_crc))
     chunk_nr += 1
 
 file.seek( 0)

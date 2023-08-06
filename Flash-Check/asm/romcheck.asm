@@ -1981,7 +1981,7 @@ PAR_LIST:
 	; flash ROM, M044
 	DB	0x76	; Strukturbyte
 	DB	8	; kByte
-	DW	0  	; Segmente
+	DW	255	; Segmente
 	DB	1	; Offset
 	DB	0	; Shift
 	DW	MSG_ROM5

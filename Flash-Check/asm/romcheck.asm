@@ -1982,7 +1982,7 @@ PAR_LIST:
 	DB	0x76	; Strukturbyte
 	DB	8	; kByte
 	DW	0  	; Segmente
-	DB	0	; Offset
+	DB	1	; Offset
 	DB	0	; Shift
 	DW	MSG_ROM5
 

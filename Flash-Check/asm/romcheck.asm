@@ -231,9 +231,11 @@ NEXTSLOT:
 	CALL	PV1
 	DB	ZKOUT
 
-	; kein ROM oder Autostart
+	; kein ROM, D004 oder Autostart
 	LD	A, (IY + PAR_STRUCT)
 	CP	1
+	JR	Z, MENUSTR
+	CP	0xA7
 	JR	Z, MENUSTR
 	CP	2
 	JR	C, CHKNEXTCR
@@ -262,16 +264,16 @@ NEXTSLOT:
 
 	CALL	PV1
 	DB	SPACE
-    
+
 	; Klammer auf
 	LD	A, '('
 	CALL	PV1
 	DB	CRT
 	
-	; Speichergröße
+	; Segmentgröße
+	LD	A, (IY + PAR_SEGSIZE)
 	LD	D, (IY + PAR_SEGMENTSH)
 	LD	E, (IY + PAR_SEGMENTSL)
-	LD	A, (IY + PAR_SEGSIZE)
 
 	CALL	mult_a_de
 	CALL	DispHL
@@ -1897,6 +1899,7 @@ MSG_ROM2:	DB	"USER ROM ", 0
 MSG_ROM3:	DB	"PROM ", 0
 MSG_ROM4:	DB	"M052 ", 0
 MSG_ROM5:	DB	"Flash ", 0
+MSG_ROM6:	DB	"D004/D008 ", 0
 
 PAR_SIZE:	EQU 8	; Länge eines Eintrags
 ; Definition der jeweilgen Offsets
@@ -1981,6 +1984,14 @@ PAR_LIST:
 	DB	0	; Offset
 	DB	0	; Shift
 	DW	MSG_ROM5
+
+	; D004/D008
+	DB	0xA7	; Strukturbyte
+	DB	8	; kByte
+	DW	0  	; Segmente
+	DB	0x01	; Offset
+	DB	6	; Shift
+	DW	MSG_ROM6
 
 	; M025/M040
 	DB	0xF7	; Strukturbyte
@@ -2215,7 +2226,7 @@ USRC_LEN: DW	0
 	;DS	ALIGN2, 0xff
 	; jeweils 128 (0x80) hinzufügen, bei asm-Fehler
 	;ds	(14 * 0x80) - $
-	ds	0xE00 - $
+	ds	0xE80 - $
 KCCEND:
 
 ; vim: set tabstop=8 noexpandtab:

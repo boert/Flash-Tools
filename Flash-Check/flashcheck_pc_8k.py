@@ -2,6 +2,7 @@
 
 import sys
 
+SLICE_SIZE = 8192
 
 
 def bytes_from_file( filename, chunksize = 8192):
@@ -52,22 +53,25 @@ filename = sys.argv[ 1]
 chunk_nr = 0
 file = open( filename, "rb")
 while True:
-    chunk = file.read( 8192)
+
+    chunk = file.read( SLICE_SIZE)
     if not chunk:
         break
+    
+    # letzten Block ggf. mit 0xFF auffüllen
     l = len( chunk)
-    if( l < 8192):
-        chunk += (bytes.fromhex('ff') * (8192-l))
+    if( l < SLICE_SIZE):
+        chunk += (bytes.fromhex('ff') * (SLICE_SIZE-l))
+
     chunk_sum = calc_sum( chunk)
     chunk_crc = calc_crc( chunk)
+
     print( "chunk #%02d:  sum: %04X  crc: %04X" % ( chunk_nr, chunk_sum, chunk_crc))
     chunk_nr += 1
 
+# zurück auf 'Los!'
 file.seek( 0)
 data = file.read()
 print( "all:\nsum: %04X\ncrc: %04X" % ( calc_sum( data), calc_crc( data)))
 file.close()
-
-#for part in range( 16):
-#    print( "part #%02d:  sum: %04X  crc: %04X" % ( part, calc_sum( data[0:8192*(part+1)]), calc_crc( data[0:8192*(part+1)])))
 

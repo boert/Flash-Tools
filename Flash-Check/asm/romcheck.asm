@@ -1900,6 +1900,7 @@ MSG_ROM3:	DB	"PROM ", 0
 MSG_ROM4:	DB	"M052 ", 0
 MSG_ROM5:	DB	"Flash ", 0
 MSG_ROM6:	DB	"D004/D008 ", 0
+MSG_ROM7:	DB	"GIDE ", 0
 
 PAR_SIZE:	EQU 8	; Länge eines Eintrags
 ; Definition der jeweilgen Offsets
@@ -2008,6 +2009,14 @@ PAR_LIST:
 	DB	0xC1	; Offset
 	DB	0	; Shift
 	DW	MSG_ROM2
+
+	; M064
+	DB	0xF9	; Strukturbyte
+	DB	16	; kByte
+	DW	2	; Segmente
+	DB	0xC1	; Offset
+	DB	6	; Shift
+	DW	MSG_ROM7
 
 	; M012/M026/M027
 	DB	0xFB	; Strukturbyte

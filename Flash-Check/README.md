@@ -95,6 +95,7 @@ M047  | 128k segmented ROM       | 72           |  8k          | 16       | AASS
 M048  | 256k segmented ROM       | 73           | 16k          | 16       | AASSSSxM   | C1    | 2
 M049  | 512k segmented ROM       | 74           | 16k          | 32       | AASSSSSM   | C1    | 1
 M052  | USB + Netzwerk           | FD           |  8k          |  4       | AAASSPxM   | C1    | 3
+M064  | GIDE-Modul für CP/M      | F9           | 16k          |  2       | AAxPxxWM   | 81    | 6
 D004  | Floppy Disk Basis 4 MHz  | A7           |  8k          |  1       | xxAxxKxM   | 01    | %
 D008  | Floppy Disk Basis 8 MHz  | A7           |  8k          |  4       | SSAxxKxM   | 01    | 6
 

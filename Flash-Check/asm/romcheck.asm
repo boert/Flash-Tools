@@ -63,6 +63,7 @@ NCAOS:	EQU	0B7B4h
 FARB:	EQU	0B7D6h
 
 ;---------------------------------------- 
+; hier gehts los!
 
 PROGADR: EQU 0200h
 
@@ -1277,9 +1278,9 @@ ID_FOUND:
 	RET
 
 
-    ;------------------------------
-    ; Multiplikation 8 Bit * 16 Bit
-    ; https://wikiti.brandonw.net/index.php?title=Z80_Routines:Math:Multiplication#16.2A8_multiplication
+        ;------------------------------
+        ; Multiplikation 8 Bit * 16 Bit
+        ; https://wikiti.brandonw.net/index.php?title=Z80_Routines:Math:Multiplication#16.2A8_multiplication
 mult_a_de:
         ld	c, 0
         ld	h, c
@@ -1912,6 +1913,7 @@ PAR_OFFSET:	EQU 4
 PAR_SHIFT:	EQU 5
 PAR_MSGL:	EQU 6
 PAR_MSGH:	EQU 7
+
 ; hier gehts los
 PAR_LIST:
 	; Autostart
@@ -1931,6 +1933,7 @@ PAR_LIST:
 	DW	MSG_ROM2;		+6
 
 	;  32k ROM
+	; AASSxxxM
 	DB	0x70	; Strukturbyte
 	DB	8	; kByte
 	DW	4	; Segmente
@@ -1939,6 +1942,7 @@ PAR_LIST:
 	DW	MSG_ROM2
 
 	;  64k ROM (Brücken umsetzen!)
+	; AASSSxxM
 	DB	0x71	; Strukturbyte
 	DB	8	; kByte
 	DW	8	; Segmente
@@ -1947,6 +1951,7 @@ PAR_LIST:
 	DW	MSG_ROM1
 
 	; 128k ROM
+	; AASSSSxM
 	DB	0x72	; Strukturbyte
 	DB	8	; kByte
 	DW	16	; Segmente
@@ -1955,6 +1960,7 @@ PAR_LIST:
 	DW	MSG_ROM1
 
 	; 256k ROM
+	; AASSSSxM
 	DB	0x73	; Strukturbyte
 	DB	16	; kByte
 	DW	16	; Segmente
@@ -1963,6 +1969,7 @@ PAR_LIST:
 	DW	MSG_ROM1
 
 	; 512k ROM
+	; AASSSSSM
 	DB	0x74	; Strukturbyte
 	DB	16	; kByte
 	DW	32	; Segmente
@@ -1979,14 +1986,16 @@ PAR_LIST:
 	DW	MSG_ROM1
 
 	; flash ROM, M044
+	; SSSSSSSM
 	DB	0x76	; Strukturbyte
 	DB	8	; kByte
-	DW	255	; Segmente
+	DW	128	; Segmente
 	DB	1	; Offset
-	DB	0	; Shift
+	DB	1	; Shift
 	DW	MSG_ROM5
 
 	; D004/D008
+	; SSAxxKxM
 	DB	0xA7	; Strukturbyte
 	DB	8	; kByte
 	DW	0  	; Segmente
@@ -1995,6 +2004,7 @@ PAR_LIST:
 	DW	MSG_ROM6
 
 	; M025/M040
+	; AAAxxxxM
 	DB	0xF7	; Strukturbyte
 	DB	8	; kByte
 	DW	1	; Segmente
@@ -2003,6 +2013,7 @@ PAR_LIST:
 	DW	MSG_ROM2
 
 	; M028/M040
+	; AAxxxxxM
 	DB	0xF8	; Strukturbyte
 	DB	16	; kByte
 	DW	1	; Segmente
@@ -2011,6 +2022,7 @@ PAR_LIST:
 	DW	MSG_ROM2
 
 	; M064
+	; AAxPxxWM
 	DB	0xF9	; Strukturbyte
 	DB	16	; kByte
 	DW	2	; Segmente
@@ -2019,6 +2031,7 @@ PAR_LIST:
 	DW	MSG_ROM7
 
 	; M012/M026/M027
+	; AAAxxxxM
 	DB	0xFB	; Strukturbyte
 	DB	8	; kByte
 	DW	1	; Segmente
@@ -2027,6 +2040,7 @@ PAR_LIST:
 	DW	MSG_ROM3
 
 	; M006/M028
+	; AAxxxxxM
 	DB	0xFC	; Strukturbyte
 	DB	16	; kByte
 	DW	1	; Segmente
@@ -2035,6 +2049,7 @@ PAR_LIST:
 	DW	MSG_ROM3
 
 	; M052
+	; AAASSPxM
 	DB	0xFD	; Strukturbyte
 	DB	8	; kByte
 	DW	4	; Segmente

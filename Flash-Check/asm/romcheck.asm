@@ -1809,11 +1809,62 @@ CHECK_UC:
 
 	; Status wegspeichern
 	PUSH	DE
+	
+	CALL	CAOS_VERSION
+	CP	0x43
+	JR	C, ONE_SEG
 
-	; Modul aktivieren
+	LD	A, 0xF1
+	CALL	CALC_UC
+	LD	HL, MSG_UC
+        CALL	PV1
+        DB	ZKOUT
+
+	LD	A, 0xD1
+	CALL	CALC_UC
+	LD	HL, MSG_UC
+        CALL	PV1
+        DB	ZKOUT
+
+	LD	A, 0xE1
+	CALL	CALC_UC
+	LD	HL, MSG_UC
+        CALL	PV1
+        DB	ZKOUT
+
+	LD	A, 0xC1
+	CALL	CALC_UC
+
+	JR	SKIP_SEG
+ONE_SEG:
+
+	LD	A, 0xF1
+	CALL	CALC_UC
+
+SKIP_SEG:
+	; Status rausholen
+	POP 	DE
+	
+	; Modulstatus wiederherstellen
 	LD	L, 2
 	LD	A, 2
-	LD	D, 0xC1
+	CALL	PV1
+	DB	MODU
+	RET
+
+SKIP_UC:
+	LD	HL, MSG_NO
+        CALL	PV1
+        DB	ZKOUT
+
+	RET
+
+	; A = Parameter (C1, D1, E1, F1)
+CALC_UC:
+	; Modul aktivieren
+	LD	D, A
+	LD	L, 2
+	LD	A, 2
 	CALL	PV1
 	DB	MODU
 
@@ -1836,24 +1887,7 @@ CHECK_UC:
 
         CALL    PV1
         DB      CRLF
-
-	; Status rausholen
-	POP 	DE
-	
-	; Modulstatus wiederherstellen
-	LD	L, 2
-	LD	A, 2
-	CALL	PV1
-	DB	MODU
 	RET
-
-SKIP_UC:
-	LD	HL, MSG_NO
-        CALL	PV1
-        DB	ZKOUT
-
-	RET
-
 
 	; Ermittelt die CAOS-Version
 	; von 2.2 über 3.1 bis 4.8

@@ -2059,11 +2059,38 @@ PAR_LIST:
 	DB	0	; Shift
 	DW	MSG_ROM1
 
-	; flash ROM, M044
+	; Flash ROM, M044 (1 MByte)
 	; SSSSSSSM
 	DB	0x76	; Strukturbyte
 	DB	8	; kByte
 	DW	128	; Segmente
+	DB	1	; Offset
+	DB	1	; Shift
+	DW	MSG_ROM5
+
+	; Flash ROM, M044 (2 MByte)
+	; SSSSssWD SSSSSSSM
+	DB	0x76	; Strukturbyte
+	DB	8	; kByte
+	DW	256	; Segmente
+	DB	1	; Offset
+	DB	1	; Shift
+	DW	MSG_ROM5
+
+	; Flash ROM, M044 (4 MByte)
+	; SSSSssWD SSSSSSSM
+	DB	0x76	; Strukturbyte
+	DB	8	; kByte
+	DW	512	; Segmente
+	DB	1	; Offset
+	DB	1	; Shift
+	DW	MSG_ROM5
+
+	; Flash ROM, M044 (8 MByte)
+	; SSSSssWD SSSSSSSM
+	DB	0x76	; Strukturbyte
+	DB	8	; kByte
+	DW	1024	; Segmente
 	DB	1	; Offset
 	DB	1	; Shift
 	DW	MSG_ROM5
@@ -2175,14 +2202,31 @@ CRC_LIST:
 	DW	0x3FA4
 	DB	"M052 USB 3.0", 0
     
-	DW	0x0540
+	; klassisch
+	DW	0xCB21
 	DB	"CAOS 4.8 E", 0
 
-	DW	0x1027
+	DW	0x579C
+	DB	"CAOS 4.8 C", 0
+    
+	; schmal/dünn
+	DW	0x7F33
+	DB	"CAOS 4.8 E", 0
+
+	DW	0xAFF8
 	DB	"CAOS 4.8 C", 0
 
+	DW	0xF50A
+	DB	"CAOS 4.8 USER 0", 0
+
+	DW	0xF843
+	DB	"CAOS 4.8 USER 1", 0
+
+	DW	0x4AFD
+	DB	"CAOS 4.8 USER 2", 0
+
 	DW	0x4F53
-	DB	"CAOS 4.8 USER", 0
+	DB	"CAOS 4.8 USER 3", 0
     
 	DW	0xCCCF
 	DB	"CAOS 4.7 E", 0
@@ -2324,7 +2368,7 @@ USRC_LEN: DW	0
 	;DS	ALIGN2, 0xff
 	; jeweils 128 (0x80) hinzufügen, bei asm-Fehler
 	;ds	(14 * 0x80) - $
-	ds	0xE80 - $
+	ds	0xF00 - $
 KCCEND:
 
 ; vim: set tabstop=8 noexpandtab:

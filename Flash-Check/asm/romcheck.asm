@@ -187,7 +187,12 @@ CRCHELP:
         DB	"ROMSEARCH"
         DB	01h
 
-	LD	C, 0	; Startwert für Slot
+	; 85/3?
+	CALL	CAOS_VERSION
+	CP	0x31
+	CALL	Z, BASIC_OFF
+
+	LD	C, 08h	; Startwert für Slot
 	
 NEXTSLOT:
 	; auf Break testen
@@ -1397,6 +1402,7 @@ Num2:	inc	a
 	DB	CRT
 	ret 
 
+
 	;------------------------------
 	; gibt die ersten 6 Bytes vom Segment aus
 BYTES:
@@ -1536,6 +1542,17 @@ BASIC_OFF:
 	LD	A, 2
 	LD	L, 2
 	LD	D, 0
+
+	CALL	PV1
+	DB	MODU
+	
+	RET
+
+	; Schaltet BASIC zu
+BASIC_ON:
+	LD	A, 2
+	LD	L, 2
+	LD	D, 1
 
 	CALL	PV1
 	DB	MODU

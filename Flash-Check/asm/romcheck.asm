@@ -1,5 +1,9 @@
 ; bekannte Fehler:
-; - Parameteranzahl klappt unter CAOS 3.1 nicht
+; - M044 hat noch keine Größenerkennung
+; - M044 Unterstützung Segmentsteuerwort für 081h noch unvollständig
+;
+; gefixt:
+; - Parameteranzahl klappt unter CAOS 3.1 nicht --> LD A, (ARGN)
 
 ;---------------------------------------- 
 
@@ -1362,6 +1366,8 @@ DispHL:
 	PUSH	HL
 	PUSH	BC
 	PUSH	DE
+	; B = Anzahl der ausgegebenen Stellen
+	ld	b, 0
 	CALL	disprun
 	; wenn B = 0 (= nix ausgegeben)
 	ld	a, b
@@ -1395,8 +1401,18 @@ Num2:	inc	a
 	jr	c,Num2
 	sbc	hl,de
 	
+	; wenn ungleich Null, sofort ausgeben
 	cp	'0'
-	ret	z
+	jr	nz, putc
+
+	ld	c, a
+	ld	a, b
+	; wenn schon eine Stelle ausgegeben wurde,
+	; dann ausgeben, sonst zurück
+	cp      0
+	ld      a, c
+	ret     z
+putc:
 	inc	b
 
 	CALL	PV1

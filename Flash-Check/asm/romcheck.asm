@@ -80,9 +80,9 @@ PROGADR: EQU 0200h
         DW	START       ; Startadresse
 
         DS	9
-        DB	"fuer KC85/4/5; "
+        DB	"fuer KC85/3/4/5; "
         DB	"B. Lange; "
-        DB	"07/2023"
+        DB	"07/2023-01/2024"
 
 
 ;ALIGN1	EQU	128 - (($+128) MOD 128) ; pasmo
@@ -95,6 +95,8 @@ KCCBEGIN:
         DW	07F7Fh
         DB	"SUM"
         DB	01h
+
+	LD	A, (ARGN)
 	
 	; A = ARGN (0..3)
 	; HL = ARG1
@@ -141,6 +143,8 @@ SUMHELP:
         DW	07F7Fh
         DB	"CRC"
         DB	01h
+	
+	LD	A, (ARGN)
 
 	; Abfrage: kleiner 2 (=0 oder =1)
 	CP	2
@@ -318,6 +322,8 @@ CHKNEXT:
         DB	"ROMCHECK"
         DB	01h
 START:
+
+	LD	A, (ARGN)
         ; Parameter
         ;  A = ARGN A=Anzahl
         ; HL = ARG1 L=Modulschacht

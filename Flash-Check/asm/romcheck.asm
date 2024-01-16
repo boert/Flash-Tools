@@ -488,7 +488,7 @@ INPUT_SEGMENTS2:
 	CALL	CLRLINE
 
 
-        LD	A, (IY + PAR_OFFSET)
+        LD	A, (IY + PAR_OFFSET80)
 	; auf 0 prüfen
 	OR	A
 	JR	NZ, OFFSET_SHIFT_OK
@@ -502,7 +502,7 @@ INPUT_SEGMENTS2:
 
 	; abspeichern
 	LD	A, L
-	LD	(IY + PAR_OFFSET), A
+	LD	(IY + PAR_OFFSET80), A
 
 	; Shift noch eingeben
         LD	HL, MSGSHIFT
@@ -514,17 +514,20 @@ INPUT_SEGMENTS2:
 
 	; abspeichern
 	LD	A, L
-	LD	(IY + PAR_SHIFT), A
+	LD	(IY + PAR_SHIFT80), A
 
 OFFSET_SHIFT_OK:
 
 
 	; mehr als 1 Segment?
-	; (weniger als 2 Segmente)
+	LD	A, (IY + PAR_SEGMENTSH)
+	CP	0
+	JR      NZ, MULTISEG
 	LD	A, (IY + PAR_SEGMENTSL)
 	CP	2
 	JR      C, NOSINGLE
 
+MULTISEG:
         ; Ausgabe Header
 	LD	HL, MSGHEADER
         CALL	PV1
@@ -1182,7 +1185,7 @@ SET_SEGMENT:
 	PUSH    BC
 	PUSH	DE
 
-	LD	B, (IY + PAR_SHIFT)
+	LD	B, (IY + PAR_SHIFT80)
 
 	; shiften
 SHIFT_NEXT:
@@ -1197,7 +1200,7 @@ SHIFT_NEXT:
 SHIFT_READY:
 	; und Offset addieren
 	LD	B, 0
-	LD	C, (IY + PAR_OFFSET)
+	LD	C, (IY + PAR_OFFSET80)
 	ADD	HL, BC
 	; jetzt Steuerbyte in HL
 
@@ -1977,16 +1980,18 @@ MSG_ROM5:	DB	"Flash ", 0
 MSG_ROM6:	DB	"D004/D008 ", 0
 MSG_ROM7:	DB	"GIDE ", 0
 
-PAR_SIZE:	EQU 8	; Länge eines Eintrags
+PAR_SIZE:	EQU 10	; Länge eines Eintrags
 ; Definition der jeweilgen Offsets
 PAR_STRUCT:	EQU 0
 PAR_SEGSIZE:	EQU 1
 PAR_SEGMENTSL:	EQU 2
 PAR_SEGMENTSH:	EQU 3
-PAR_OFFSET:	EQU 4
-PAR_SHIFT:	EQU 5
-PAR_MSGL:	EQU 6
-PAR_MSGH:	EQU 7
+PAR_OFFSET80:	EQU 4
+PAR_SHIFT80:	EQU 5
+PAR_OFFSET81:	EQU 6
+PAR_SHIFT81:	EQU 7
+PAR_MSGL:	EQU 8
+PAR_MSGH:	EQU 9
 
 ; hier gehts los
 PAR_LIST:
@@ -1994,16 +1999,20 @@ PAR_LIST:
 	DB	0x01	; Strukturbyte	+0
 	DB	0	; kByte		+1
 	DW	0	; Segmente	+2
-	DB	0	; Offset	+4
-	DB	0	; Shift		+5
-	DW	MSG_01  ;		+6
+	DB	0	; Offset 80	+4
+	DB	0	; Shift	80	+5
+	DB	0	; Offset 81	+6
+	DB	0	; Shift	81	+7
+	DW	MSG_01  ;
 	
 	; USER-ROM
 	DB	0x02	; Strukturbyte	+0
 	DB	8	; kByte		+1
 	DW	4	; Segmente	+2
-	DB	0xC1	; Offset	+4
-	DB	4	; Shift		+5
+	DB	0xC1	; Offset 80	+4
+	DB	4	; Shift	80	+5
+	DB	0	; Offset 81	+6
+	DB	0	; Shift	81	+7
 	DW	MSG_ROM2;		+6
 
 	;  32k ROM
@@ -2011,8 +2020,10 @@ PAR_LIST:
 	DB	0x70	; Strukturbyte
 	DB	8	; kByte
 	DW	4	; Segmente
-	DB	0xC1	; Offset
-	DB	4	; Shift
+	DB	0xC1	; Offset 80
+	DB	4	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM2
 
 	;  64k ROM (Brücken umsetzen!)
@@ -2020,8 +2031,10 @@ PAR_LIST:
 	DB	0x71	; Strukturbyte
 	DB	8	; kByte
 	DW	8	; Segmente
-	DB	0xC1	; Offset
-	DB	3	; Shift
+	DB	0xC1	; Offset 80
+	DB	3	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM1
 
 	; 128k ROM
@@ -2029,8 +2042,10 @@ PAR_LIST:
 	DB	0x72	; Strukturbyte
 	DB	8	; kByte
 	DW	16	; Segmente
-	DB	0xC1	; Offset
-	DB	2	; Shift
+	DB	0xC1	; Offset 80
+	DB	2	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM1
 
 	; 256k ROM
@@ -2038,8 +2053,10 @@ PAR_LIST:
 	DB	0x73	; Strukturbyte
 	DB	16	; kByte
 	DW	16	; Segmente
-	DB	0xC1	; Offset
-	DB	2	; Shift
+	DB	0xC1	; Offset 80
+	DB	2	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM1
 
 	; 512k ROM
@@ -2047,34 +2064,31 @@ PAR_LIST:
 	DB	0x74	; Strukturbyte
 	DB	16	; kByte
 	DW	32	; Segmente
-	DB	0xC1   	; Offset
-	DB	1	; Shift
+	DB	0xC1   	; Offset 80
+	DB	1	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM1
 
 	; 1024k ROM, M050
 	DB	0x75	; Strukturbyte
 	DB	8	; kByte
 	DW	128	; Segmente
-	DB	1	; Offset
-	DB	0	; Shift
+	DB	1	; Offset 80
+	DB	1	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM1
-
-	; Flash ROM, M044 (1 MByte)
-	; SSSSSSSM
-	DB	0x76	; Strukturbyte
-	DB	8	; kByte
-	DW	128	; Segmente
-	DB	1	; Offset
-	DB	1	; Shift
-	DW	MSG_ROM5
 
 	; Flash ROM, M044 (2 MByte)
 	; SSSSssWD SSSSSSSM
 	DB	0x76	; Strukturbyte
 	DB	8	; kByte
 	DW	256	; Segmente
-	DB	1	; Offset
-	DB	1	; Shift
+	DB	1	; Offset 80
+	DB	1	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM5
 
 	; Flash ROM, M044 (4 MByte)
@@ -2082,8 +2096,10 @@ PAR_LIST:
 	DB	0x76	; Strukturbyte
 	DB	8	; kByte
 	DW	512	; Segmente
-	DB	1	; Offset
-	DB	1	; Shift
+	DB	1	; Offset 80
+	DB	1	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM5
 
 	; Flash ROM, M044 (8 MByte)
@@ -2091,8 +2107,10 @@ PAR_LIST:
 	DB	0x76	; Strukturbyte
 	DB	8	; kByte
 	DW	1024	; Segmente
-	DB	1	; Offset
-	DB	1	; Shift
+	DB	1	; Offset 80
+	DB	1	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM5
 
 	; D004/D008
@@ -2100,8 +2118,10 @@ PAR_LIST:
 	DB	0xA7	; Strukturbyte
 	DB	8	; kByte
 	DW	0  	; Segmente
-	DB	0x01	; Offset
-	DB	6	; Shift
+	DB	0x01	; Offset 80
+	DB	6	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM6
 
 	; M025/M040
@@ -2109,8 +2129,10 @@ PAR_LIST:
 	DB	0xF7	; Strukturbyte
 	DB	8	; kByte
 	DW	1	; Segmente
-	DB	0xC1	; Offset
-	DB	0	; Shift
+	DB	0xC1	; Offset 80
+	DB	0	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM2
 
 	; M028/M040
@@ -2118,8 +2140,10 @@ PAR_LIST:
 	DB	0xF8	; Strukturbyte
 	DB	16	; kByte
 	DW	1	; Segmente
-	DB	0xC1	; Offset
-	DB	0	; Shift
+	DB	0xC1	; Offset 80
+	DB	0	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM2
 
 	; M064
@@ -2127,8 +2151,10 @@ PAR_LIST:
 	DB	0xF9	; Strukturbyte
 	DB	16	; kByte
 	DW	2	; Segmente
-	DB	0xC1	; Offset
-	DB	6	; Shift
+	DB	0xC1	; Offset 80
+	DB	6	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM7
 
 	; M012/M026/M027
@@ -2136,8 +2162,10 @@ PAR_LIST:
 	DB	0xFB	; Strukturbyte
 	DB	8	; kByte
 	DW	1	; Segmente
-	DB	0xC1	; Offset
-	DB	0	; Shift
+	DB	0xC1	; Offset 80
+	DB	0	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM3
 
 	; M006/M028
@@ -2145,8 +2173,10 @@ PAR_LIST:
 	DB	0xFC	; Strukturbyte
 	DB	16	; kByte
 	DW	1	; Segmente
-	DB	0xC1	; Offset
-	DB	0	; Shift
+	DB	0xC1	; Offset 80
+	DB	0	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM3
 
 	; M052
@@ -2154,8 +2184,10 @@ PAR_LIST:
 	DB	0xFD	; Strukturbyte
 	DB	8	; kByte
 	DW	4	; Segmente
-	DB	0xC1	; Offset
-	DB	3	; Shift
+	DB	0xC1	; Offset 80
+	DB	3	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSG_ROM4
 	
 	; unknown
@@ -2163,8 +2195,10 @@ PAR_LIST:
 	DB	0x00	; Strukturbyte	
 	DB	0	; kByte
 	DW	0	; Segmente
-	DB	0	; Offset
-	DB	0	; Shift
+	DB	0	; Offset 80
+	DB	0	; Shift 80
+	DB	0	; Offset 81
+	DB	0	; Shift	81
 	DW	MSGUNKOWN
 
 
@@ -2368,7 +2402,7 @@ USRC_LEN: DW	0
 	;DS	ALIGN2, 0xff
 	; jeweils 128 (0x80) hinzufügen, bei asm-Fehler
 	;ds	(14 * 0x80) - $
-	ds	0xF00 - $
+	ds	0xF80 - $
 KCCEND:
 
 ; vim: set tabstop=8 noexpandtab:

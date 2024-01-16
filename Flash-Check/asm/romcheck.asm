@@ -314,10 +314,11 @@ CHKNEXT:
 	POP	BC
 	INC	C
 	LD	A, C
-	CP 	0xFF	; Endwert für Slot
+	CP 	0xFF		; Endwert für Slot
 	JP	NZ, NEXTSLOT
 
 	CALL	CLRLINE 
+	CALL	BASIC_ON	; für 85/3
 	RET
 
 
@@ -1215,7 +1216,7 @@ SHIFT_READY:
 	LD	B, A
 	LD	C, 081h
 
-	LD	A, L
+	LD	A, H          ; High(Steuerbyte)
 	OUT	(C), A
 
 	POP	BC
